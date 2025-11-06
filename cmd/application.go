@@ -218,12 +218,71 @@ func (a *application) toggleGuildsTree() {
 	}
 }
 
+<<<<<<< HEAD
 func (a *application) focusGuildsTree() bool {
 	// The guilds tree is not hidden if the number of items is two.
 	// Check if the guilds tree is visible in the flex container
 	if a.flex != nil && a.flex.GetItemCount() >= 2 {
 		a.SetFocus(a.guildsTree)
 		return true
+=======
+func (a *application) onPagesInputCapture(event *tcell.EventKey) *tcell.EventKey {
+	switch event.Name() {
+	case a.cfg.Keys.FocusGuildsTree:
+		a.messageInput.removeMentionsList()
+		// The guilds tree is not hidden if the number of items is two.
+		if a.flex.GetItemCount() == 2 {
+			a.SetFocus(a.guildsTree)
+		}
+		return nil
+	case a.cfg.Keys.FocusMessagesList:
+		a.messageInput.removeMentionsList()
+		a.SetFocus(a.messagesList)
+		return nil
+	case a.cfg.Keys.FocusMessageInput:
+		a.SetFocus(a.messageInput)
+		return nil
+	case a.cfg.Keys.FocusPrevious:
+		switch a.GetFocus() {
+		case a.guildsTree:
+			a.SetFocus(a.messageInput)
+		case a.messageInput:
+			a.SetFocus(a.messagesList)
+		default: // Handle both a.messagesList and a.flex as well as other edge cases (if there is).
+			if a.flex.GetItemCount() == 2 {
+				a.SetFocus(a.guildsTree)
+			} else { // If there is no guild tree, the correct previous page is message input.
+				a.SetFocus(a.messageInput)
+			}
+		}
+		return nil
+	case a.cfg.Keys.FocusNext:
+		switch a.GetFocus() {
+		case a.guildsTree:
+			a.SetFocus(a.messagesList)
+		case a.messagesList:
+			a.SetFocus(a.messageInput)
+		default: // Handle both a.messageInput and a.flex as well as other edge cases (if there is).
+			if a.flex.GetItemCount() == 2 {
+				a.SetFocus(a.guildsTree)
+			} else { // If there is no guild tree, the correct next page is message input.
+				a.SetFocus(a.messagesList)
+			}
+		}
+		return nil
+	case a.cfg.Keys.Logout:
+		a.quit()
+
+		if err := keyring.Delete(consts.Name, "token"); err != nil {
+			slog.Error("failed to delete token from keyring", "err", err)
+			return nil
+		}
+
+		return nil
+	case a.cfg.Keys.ToggleGuildsTree:
+		a.toggleGuildsTree()
+		return nil
+>>>>>>> 2af722b (feat(config): add keybinds to cycle focus between widgets (#613))
 	}
 
 	return false
