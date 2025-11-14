@@ -1,4 +1,6 @@
-## **Discordo** is a lightweight, secure, and feature-rich Discord terminal client with **TIP.CC** autoclaim support.
+# Discordo
+
+### Discordo is a lightweight, secure, and feature-rich Discord terminal client with **TIP.CC** autoclaim support.
 
 ![Preview](.github/preview.png)
 

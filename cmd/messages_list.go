@@ -633,7 +633,7 @@ func (ml *messagesList) drawEmbeds(message discord.Message) {
 			if ml.cfg.Markdown {
 				ast := discordmd.Parse(desc)
 				fmt.Fprint(ml, "[::d]│[-] ")
-				markdown.DefaultRenderer.Render(ml, desc, ast)
+				ml.renderer.Render(ml, desc, ast)
 			} else {
 				fmt.Fprintf(ml, "[::d]│[-] %s", desc)
 			}
