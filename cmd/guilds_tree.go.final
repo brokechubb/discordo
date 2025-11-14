@@ -183,11 +183,11 @@ func (gt *guildsTree) onSelected(node *tview.TreeNode) {
 		case discord.GuildVoice, discord.GuildStageVoice:
 			// Voice channels don't support messages directly, but we should look for associated text channels
 			slog.Debug("voice channel selected, looking for associated text channel", "channel_type", channel.Type, "channel_name", channel.Name, "channel_id", channel.ID)
-
+			
 			// Find associated text channel in the same category or with similar name
 			textChannelID := gt.findAssociatedTextChannel(*channel)
 			if textChannelID.IsValid() {
-				slog.Info("found associated text channel", "voice_channel", channel.Name, "text_channel_id", textChannelID, "voice_channel_id", channel.ID)
+				slog.Debug("found associated text channel", "voice_channel", channel.Name, "text_channel_id", textChannelID, "voice_channel_id", channel.ID)
 				// Get the text channel and process it
 				textChannel, err := discordState.Cabinet.Channel(textChannelID)
 				if err != nil {
@@ -202,17 +202,11 @@ func (gt *guildsTree) onSelected(node *tview.TreeNode) {
 					gt.selectedGuildID = channel.GuildID
 					return
 				}
-
+				
 				// Get messages for the text channel and process it
 				var messages []discord.Message
 				var fetchErr error
 				if textChannel.Type != discord.DirectMessage && textChannel.Type != discord.GroupDM {
-					hasViewPerm := discordState.HasPermissions(textChannel.ID, discord.PermissionViewChannel)
-					slog.Debug("permission check result for associated text channel", "channel_id", textChannel.ID, "channel_name", textChannel.Name, "has_view_permission", hasViewPerm)
-					if !hasViewPerm {
-						messages = []discord.Message{}
-						fetchErr = nil
-					} else {
 						messages, fetchErr = discordState.Messages(textChannel.ID, uint(gt.cfg.MessagesLimit))
 					}
 				} else {
@@ -245,38 +239,82 @@ func (gt *guildsTree) onSelected(node *tview.TreeNode) {
 				return
 			}
 		default:
-			// All other channel types (including text channels) proceed with normal processing
+			// All other channel types are assumed to support messages
+			// This includes text channels and other types that might have messages
 			slog.Debug("proceeding with message fetch for channel type", "channel_type", channel.Type, "channel_name", channel.Name, "channel_id", channel.ID)
-
-			go discordState.ReadState.MarkRead(channel.ID, channel.LastMessageID)
-
-			messages, err := discordState.Messages(channel.ID, uint(gt.cfg.MessagesLimit))
-			if err != nil {
-				slog.Error("failed to get messages", "err", err, "channel_id", channel.ID, "limit", gt.cfg.MessagesLimit)
-				return
-			}
-
-			if guildID := channel.GuildID; guildID.IsValid() {
-				app.messagesList.requestGuildMembers(guildID, messages)
-			}
-
-			app.messagesList.reset()
-			app.messagesList.setTitle(*channel)
-			app.messagesList.drawMessages(messages)
-			app.messagesList.ScrollToEnd()
-
-			hasNoPerm := channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM && !discordState.HasPermissions(channel.ID, discord.PermissionSendMessages)
-			app.messageInput.SetDisabled(hasNoPerm)
-			if hasNoPerm {
-				app.messageInput.SetPlaceholder("You do not have permission to send messages in this channel.")
-			} else {
-				app.messageInput.SetPlaceholder("Message...")
-				app.SetFocus(app.messageInput)
-			}
-
-			gt.selectedChannelID = channel.ID
-			gt.selectedGuildID = channel.GuildID
 		}
+
+		default:
+			// All other channel types are assumed to support messages
+			// This includes text channels and other types that might have messages
+			slog.Debug("proceeding with message fetch for channel type", "channel_type", channel.Type, "channel_name", channel.Name, "channel_id", channel.ID)
+		}
+
+		go discordState.ReadState.MarkRead(channel.ID, channel.LastMessageID)
+
+		slog.Debug("attempting to fetch messages", "channel_id", channel.ID, "channel_name", channel.Name, "limit", gt.cfg.MessagesLimit, "channel_type", channel.Type, "guild_id", channel.GuildID, "timestamp", time.Now().UnixNano())
+
+		// Initialize messages variable first
+		var messages []discord.Message
+		var fetchErr error
+
+		// Check permissions before attempting to fetch messages
+		if channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM {
+			hasViewPerm := discordState.HasPermissions(channel.ID, discord.PermissionViewChannel)
+			slog.Debug("permission check result", "channel_id", channel.ID, "channel_name", channel.Name, "has_view_permission", hasViewPerm, "timestamp", time.Now().UnixNano())
+			if !hasViewPerm {
+				slog.Warn("insufficient permissions to view channel", "channel_id", channel.ID, "channel_name", channel.Name, "timestamp", time.Now().UnixNano())
+				// Proceed with empty messages instead of failing completely
+				messages = []discord.Message{}
+				fetchErr = nil
+			} else {
+				slog.Debug("proceeding with message fetch - has permissions", "channel_id", channel.ID, "timestamp", time.Now().UnixNano())
+				messages, fetchErr = discordState.Messages(channel.ID, uint(gt.cfg.MessagesLimit))
+				slog.Debug("message fetch completed", "channel_id", channel.ID, "err", fetchErr, "message_count", len(messages), "timestamp", time.Now().UnixNano())
+			}
+		} else {
+			// For DMs and GroupDMs, skip permission checks
+			slog.Debug("proceeding with message fetch for DM/GroupDM - skipping permissions check", "channel_id", channel.ID, "timestamp", time.Now().UnixNano())
+			messages, fetchErr = discordState.Messages(channel.ID, uint(gt.cfg.MessagesLimit))
+			slog.Debug("message fetch completed for DM/GroupDM", "channel_id", channel.ID, "err", fetchErr, "message_count", len(messages), "timestamp", time.Now().UnixNano())
+		}
+
+		if fetchErr != nil {
+			slog.Debug("primary message fetch failed, handling error", "channel_id", channel.ID, "err", fetchErr, "timestamp", time.Now().UnixNano())
+			// Check if this is a JSON decoding error related to unknown components
+			errStr := fetchErr.Error()
+			if strings.Contains(errStr, "JSON decoding failed") && strings.Contains(errStr, "UnknownComponent") {
+				slog.Warn("skipping channel due to JSON decoding issue with unknown components", "channel_id", channel.ID, "channel_name", channel.Name, "err", fetchErr, "timestamp", time.Now().UnixNano())
+				// Still proceed with empty messages to show the channel without problematic messages
+				messages = []discord.Message{}
+			} else {
+				slog.Error("failed to get messages", "err", fetchErr, "channel_id", channel.ID, "limit", gt.cfg.MessagesLimit, "timestamp", time.Now().UnixNano())
+				// Try to fetch messages from the cabinet as a fallback
+				slog.Debug("attempting fallback message fetch from cabinet", "channel_id", channel.ID, "timestamp", time.Now().UnixNano())
+				cabinetMessages, cabinetErr := discordState.Cabinet.Messages(channel.ID)
+				if cabinetErr != nil {
+					slog.Error("fallback cabinet message fetch also failed", "err", cabinetErr, "channel_id", channel.ID, "timestamp", time.Now().UnixNano())
+					return
+				}
+				slog.Debug("successfully fetched messages from cabinet fallback", "channel_id", channel.ID, "message_count", len(cabinetMessages), "timestamp", time.Now().UnixNano())
+				messages = cabinetMessages
+			}
+		} else {
+			slog.Debug("primary message fetch succeeded", "channel_id", channel.ID, "message_count", len(messages), "timestamp", time.Now().UnixNano())
+		}
+
+		// Now set err to fetchErr for any remaining error handling
+		err = fetchErr
+
+		slog.Debug("successfully fetched messages", "channel_id", channel.ID, "channel_name", channel.Name, "message_count", len(messages), "timestamp", time.Now().UnixNano())
+		if guildID := channel.GuildID; guildID.IsValid() {
+			app.messagesList.requestGuildMembers(guildID, messages)
+		}
+
+		gt.processTextChannel(*channel, messages)
+		gt.selectedChannelID = channel.ID
+		gt.selectedGuildID = channel.GuildID
+	}
 	case nil: // Direct messages
 		channels, err := discordState.PrivateChannels()
 		if err != nil {
@@ -296,6 +334,7 @@ func (gt *guildsTree) onSelected(node *tview.TreeNode) {
 
 		for _, c := range channels {
 			gt.createChannelNode(node, c)
+}
 		}
 	}
 }
@@ -393,101 +432,31 @@ func (gt *guildsTree) findAssociatedTextChannel(voiceChannel discord.Channel) di
 			continue
 		}
 
-		// Priority 1: Check if the channel is in the same category (parent) - highest priority
+		// Check if the channel is in the same category (parent)
 		if voiceChannel.ParentID.IsValid() && channel.ParentID == voiceChannel.ParentID {
-			slog.Info("found associated text channel in same category", "voice_channel", voiceChannel.Name, "text_channel", channel.Name, "category_id", voiceChannel.ParentID)
 			return channel.ID
 		}
 
-		// Priority 2: Check for exact name match (case-insensitive)
-		if strings.EqualFold(voiceChannel.Name, channel.Name) {
-			slog.Info("found associated text channel with exact name match", "voice_channel", voiceChannel.Name, "text_channel", channel.Name)
-			return channel.ID
-		}
+		// Check for naming similarity (case-insensitive comparison)
+		voiceName := strings.ToLower(voiceChannel.Name)
+		channelName := strings.ToLower(channel.Name)
 
-		// Priority 3: Check for common naming patterns with normalization
-		voiceName := strings.ToLower(strings.TrimSpace(voiceChannel.Name))
-		channelName := strings.ToLower(strings.TrimSpace(channel.Name))
-
-		// Normalize names by removing common prefixes/suffixes and special characters
-		normalizedVoice := normalizeChannelName(voiceName)
-		normalizedChannel := normalizeChannelName(channelName)
-
-		// Check if normalized names match
-		if normalizedVoice == normalizedChannel {
-			slog.Info("found associated text channel with normalized name match", "voice_channel", voiceChannel.Name, "text_channel", channel.Name, "normalized_voice", normalizedVoice, "normalized_text", normalizedChannel)
-			return channel.ID
-		}
-
-		// Check if one name contains the other after normalization
-		if strings.Contains(normalizedChannel, normalizedVoice) || strings.Contains(normalizedVoice, normalizedChannel) {
-			slog.Info("found associated text channel with partial name match", "voice_channel", voiceChannel.Name, "text_channel", channel.Name)
-			return channel.ID
-		}
-
-		// Check for common voice/text channel patterns
-		if isAssociatedNamePattern(voiceName, channelName) {
-			slog.Info("found associated text channel with pattern match", "voice_channel", voiceChannel.Name, "text_channel", channel.Name)
+		// Common patterns: voice "General" might match text "general", "general-chat", "text-general", etc.
+		if voiceName == channelName ||
+			strings.Contains(channelName, voiceName) ||
+			strings.Contains(voiceName, channelName) ||
+			// Check for common naming patterns like "voice-general" -> "general" or "text-general"
+			(strings.Contains(voiceName, "voice") && strings.ReplaceAll(voiceName, "voice", "") == strings.ReplaceAll(channelName, "text", "")) ||
+			(strings.Contains(channelName, "text") && strings.ReplaceAll(channelName, "text", "") == strings.ReplaceAll(voiceName, "voice", "")) ||
+			// Check for similar names with different suffixes/prefixes
+			voiceName == channelName+"-text" ||
+			channelName == voiceName+"-text" ||
+			voiceName == "text-"+channelName ||
+			channelName == "voice-"+voiceName {
 			return channel.ID
 		}
 	}
 
-	// If no associated channel found, return 0
+	// If no associated channel found in the same category or with similar name, return 0
 	return 0
-}
-
-// normalizeChannelName normalizes channel names for comparison
-func normalizeChannelName(name string) string {
-	// Remove common prefixes and suffixes, special characters, and normalize spaces
-	name = strings.ToLower(name)
-	name = strings.TrimSpace(name)
-
-	// Remove common prefixes/suffixes
-	name = strings.ReplaceAll(name, "voice", "")
-	name = strings.ReplaceAll(name, "text", "")
-	name = strings.ReplaceAll(name, "chat", "")
-	name = strings.ReplaceAll(name, "general", "gen")
-	name = strings.ReplaceAll(name, "main", "")
-	name = strings.ReplaceAll(name, "main-", "")
-	name = strings.ReplaceAll(name, "-main", "")
-	name = strings.ReplaceAll(name, "vc", "")
-	name = strings.ReplaceAll(name, "channel", "")
-	name = strings.ReplaceAll(name, "room", "")
-
-	// Remove special characters and normalize spaces/dashes
-	name = strings.ReplaceAll(name, "-", "")
-	name = strings.ReplaceAll(name, "_", "")
-	name = strings.ReplaceAll(name, " ", "")
-
-	return strings.TrimSpace(name)
-}
-
-// isAssociatedNamePattern checks for common voice/text channel naming patterns
-func isAssociatedNamePattern(voiceName, textName string) bool {
-	// Common patterns like "general-voice" <-> "general-text" or "voice-general" <-> "general"
-	if strings.Contains(voiceName, "voice") && (strings.Contains(textName, "text") || strings.Contains(textName, "chat")) {
-		// Remove voice/text parts and compare the core name
-		voiceCore := strings.ReplaceAll(voiceName, "voice", "")
-		textCore := strings.ReplaceAll(strings.ReplaceAll(textName, "text", ""), "chat", "")
-		voiceCore = strings.ReplaceAll(voiceCore, "-", "")
-		voiceCore = strings.ReplaceAll(voiceCore, "_", "")
-		textCore = strings.ReplaceAll(textCore, "-", "")
-		textCore = strings.ReplaceAll(textCore, "_", "")
-		if voiceCore == textCore && voiceCore != "" {
-			return true
-		}
-	}
-
-	// Pattern like "gaming" voice channel and "gaming-chat" text channel
-	if strings.Contains(textName, voiceName+"-chat") || strings.Contains(textName, voiceName+"-text") {
-		return true
-	}
-
-	// Pattern like "music-voice" and "music" or "music-text"
-	if strings.Contains(voiceName, "-voice") && (strings.HasPrefix(textName, strings.TrimSuffix(voiceName, "-voice")) ||
-		strings.HasPrefix(textName, strings.TrimSuffix(voiceName, "-voice")+"-text")) {
-		return true
-	}
-
-	return false
 }

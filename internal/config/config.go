@@ -31,6 +31,12 @@ type (
 		OnlyOnPing bool `toml:"only_on_ping"`
 	}
 
+	TipCC struct {
+		AutoClaim bool `toml:"auto_claim"`
+		Debug     bool `toml:"debug"`
+		Delay     int  `toml:"delay_ms"`
+	}
+
 	Config struct {
 		Mouse  bool   `toml:"mouse"`
 		Editor string `toml:"editor"`
@@ -47,6 +53,7 @@ type (
 
 		Timestamps    Timestamps    `toml:"timestamps"`
 		Notifications Notifications `toml:"notifications"`
+		TipCC         TipCC         `toml:"tipcc"`
 
 		Keys  Keys  `toml:"keys"`
 		Theme Theme `toml:"theme"`

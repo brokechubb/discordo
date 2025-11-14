@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	discordState *ningen.State
-	app          *application
+	discordState             *ningen.State
+	app                      *application
+	globalInteractionHandler *interactionHandler
 )
 
 func Run() error {

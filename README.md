@@ -1,6 +1,4 @@
-# Discordo &middot; [![discord](https://img.shields.io/discord/1297292231299956788?color=5865F2&logo=discord&logoColor=white)](https://discord.com/invite/VzF9UFn2aB) [![ci](https://github.com/ayn2op/discordo/actions/workflows/ci.yml/badge.svg)](https://github.com/ayn2op/discordo/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/ayn2op/discordo)](https://goreportcard.com/report/github.com/ayn2op/discordo) [![license](https://img.shields.io/github/license/ayn2op/discordo?logo=github)](https://github.com/ayn2op/discordo/blob/master/LICENSE)
-
-Discordo is a lightweight, secure, and feature-rich Discord terminal client. Heavily work-in-progress, expect breaking changes.
+## **Discordo** is a lightweight, secure, and feature-rich Discord terminal client with **TIP.CC** autoclaim support.
 
 ![Preview](.github/preview.png)
 
@@ -13,28 +11,9 @@ Discordo is a lightweight, secure, and feature-rich Discord terminal client. Hea
 - Notifications
 - 2-Factor & QR code authentication
 - Discord-flavored markdown
+- **Tip.cc integration with automated airdrop detection**
 
 ## Installation
-
-### Prebuilt binaries
-
-You can download and install a [prebuilt binary here](https://nightly.link/ayn2op/discordo/workflows/ci/main) for Windows, macOS, or Linux.
-
-### Package managers
-
-- Arch Linux: `yay -S discordo-git`
-- Gentoo (available on the guru repos as a live ebuild): `emerge net-im/discordo`
-- FreeBSD: `pkg install discordo` or via the ports system `make -C /usr/ports/net-im/discordo install clean`.
-- Nix (NixOS, home-manager)
-  - Downstream nixpkgs installation: Add `pkgs.discordo` to `environment.systemPackages` or `home.packages`.
-  <!-- Temporary until downstream home-manager module --> 
-  - Upstream flake installation: Add `inputs.discordo.url = "github:ayn2op/discordo"`. Install using `inputs.discordo.homeModules.default` (`.enable, .package, .settings TOML`).
-- Windows (Scoop):
-
-```sh
-scoop bucket add vvxrtues https://github.com/vvirtues/bucket
-scoop install discordo
-```
 
 ### Building from source
 
@@ -53,21 +32,98 @@ go build .
 
 ## Usage
 
-1. Run the `discordo` executable with no arguments.
+### Basic Usage
 
-> If you are logging in using an authentication token, provide the `token` command-line flag to the executable (eg: `--token "OTI2MDU5NTQxNDE2Nzc5ODA2.Yc2KKA.2iZ-5JxgxG-9Ub8GHzBSn-NJjNg"`). Alternatively, set the value of the `DISCORDO_TOKEN` environment variable to the authentication token. The token is stored securely in the default OS-specific keyring.
+1. Run the `discordo` executable with no arguments:
+
+    ```bash
+    discordo
+    ```
 
 2. Enter your email and password and click on the "Login" button to continue.
 
+### Command-Line Options
+
+```bash
+discordo [flags]
+
+Flags:
+  -token string
+        Authentication token (can also be set via DISCORDO_TOKEN environment variable)
+  -config-path string
+        Path to configuration file (default: OS-specific location)
+  -log-path string
+        Path to log file (default: OS-specific location)
+  -log-level string
+        Log level: debug, info, warn, error (default: "info")
+```
+
+### Token Authentication
+
+If you prefer to use an authentication token:
+
+```bash
+# Using command-line flag
+discordo --token "YOUR_DISCORD_TOKEN"
+
+# Using environment variable
+export DISCORDO_TOKEN="YOUR_DISCORD_TOKEN"
+discordo
+```
+
+The token is stored securely in the default OS-specific keyring for subsequent sessions.
+
+### Key Controls
+
+- **Ctrl+G**: Focus guilds tree
+- **Ctrl+T**: Focus messages list
+- **Ctrl+Space**: Focus message input
+- **Ctrl+C**: Quit application
+- **Ctrl+D**: Logout and remove token
+- **Enter**: Select channel/send message
+- **Esc**: Cancel current action
+
+For complete keybindings and configuration options, see the [Configuration Guide](./CONFIGURATION.md).
+
 ## Configuration
 
-The configuration file allows you to configure and customize the behavior, keybindings, and theme of the application.
+Discordo is highly configurable through a TOML configuration file. You can customize behavior, keybindings, themes, and more.
+
+### Configuration Location
 
 - Unix: `$XDG_CONFIG_HOME/discordo/config.toml` or `$HOME/.config/discordo/config.toml`
-- Darwin: `$HOME/Library/Application Support/discordo/config.toml`
+- macOS: `$HOME/Library/Application Support/discordo/config.toml`
 - Windows: `%AppData%/discordo/config.toml`
 
-Discordo uses the default configuration if a configuration file is not found in the aforementioned path; however, the default configuration file is not written to the path. [The default configuration can be found here](./internal/config/config.toml).
+### Getting Started
+
+Discordo uses built-in defaults if no configuration file exists. For comprehensive documentation of all options including:
+
+- Keybinding customization
+- Theme configuration
+- Notification settings
+- Tip.cc integration
+- Advanced options
+
+See the complete [Configuration Guide](./CONFIGURATION.md).
+
+### Quick Example
+
+```toml
+# Basic customization
+mouse = true
+markdown = true
+status = "online"
+
+# Custom keybindings
+[keys]
+focus_guilds_tree = "Alt+1"
+focus_messages_list = "Alt+2"
+
+# Theme tweaks
+[theme.messages_list]
+mention_style = { foreground = "magenta" }
+```
 
 ## FAQ
 
@@ -111,6 +167,43 @@ secret-tool store --label="Discord Token" service discordo username token
 ```
 
 4. When it prompts for the password, paste your token, and hit enter to confirm.
+
+## Development
+
+Discordo is open source and welcomes contributions! The project is written in Go and uses the tview library for the terminal UI.
+
+### Contributing
+
+We welcome all types of contributions:
+
+- Bug reports and feature requests
+- Code contributions and improvements
+- Documentation enhancements
+- Testing and feedback
+
+See the [Contributing Guide](./CONTRIBUTING.md) for detailed development setup and guidelines.
+
+### Building from Source
+
+```bash
+git clone https://github.com/ayn2op/discordo
+cd discordo
+go build .
+```
+
+For development commands and coding standards, see [AGENTS.md](./AGENTS.md).
+
+## Changelog
+
+For version history and upcoming features, see the [CHANGELOG.md](./CHANGELOG.md).
+
+## Support
+
+- 📖 [Documentation Index](./DOCS.md) - Complete documentation overview
+- ⚙️ [Configuration Guide](./CONFIGURATION.md) - Detailed configuration options
+- 🛠️ [Contributing Guide](./CONTRIBUTING.md) - Development and contribution guidelines
+- 💬 [Discord Server](https://discord.com/invite/VzF9UFn2aB) - Community support
+- 🐛 [Issue Tracker](https://github.com/ayn2op/discordo/issues) - Bug reports and feature requests
 
 > [!IMPORTANT]
 > Automated user accounts or "self-bots" are against Discord's Terms of Service. I am not responsible for any loss caused by using "self-bots" or Discordo.

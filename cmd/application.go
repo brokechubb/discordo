@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/ayn2op/discordo/internal/config"
 	"github.com/ayn2op/discordo/internal/keyring"
@@ -22,11 +24,13 @@ type application struct {
 	cfg *config.Config
 
 	*tview.Application
-	pages        *tview.Pages
-	flex         *tview.Flex
-	guildsTree   *guildsTree
-	messagesList *messagesList
-	messageInput *messageInput
+	pages              *tview.Pages
+	flex               *tview.Flex
+	guildsTree         *guildsTree
+	messagesList       *messagesList
+	messageInput       *messageInput
+	notificationArea   *tview.TextView
+	hasPersistentNotif bool // Track if there's a persistent notification
 }
 
 func newApplication(cfg *config.Config) *application {
@@ -82,23 +86,39 @@ func (a *application) init() {
 	a.pages.Clear()
 	a.flex.Clear()
 
+	// Create notification area
+	a.notificationArea = tview.NewTextView().
+		SetDynamicColors(true).
+		SetRegions(true).
+		SetWrap(true).
+		SetScrollable(false)
+	a.notificationArea.Box = ui.ConfigureBox(a.notificationArea.Box, &a.cfg.Theme)
+	a.notificationArea.SetTitle("Notifications")
+
 	right := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(a.messagesList, 0, 1, false).
 		AddItem(a.messageInput, 3, 1, false)
 
-	// The guilds tree is always focused first at start-up.
-	a.flex.
-		AddItem(a.guildsTree, 0, 1, true).
-		AddItem(right, 0, 4, false)
+	// Create a main flex that includes the notification area at the top
+	mainFlex := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(a.notificationArea, 3, 1, false). // Small notification area at top
+		AddItem(tview.NewFlex().
+			SetDirection(tview.FlexColumn).
+			AddItem(a.guildsTree, 0, 3, true).        // Guilds tree
+			AddItem(right, 0, 7, false), 0, 1, false) // Main content area
 
-	a.pages.AddAndSwitchToPage(flexPageName, a.flex, true)
+	a.pages.AddAndSwitchToPage(flexPageName, mainFlex, true)
 }
 
 func (a *application) onInputCapture(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Name() {
 	case a.cfg.Keys.Quit:
 		a.quit()
+		return nil
+	case a.cfg.Keys.ClearNotification:
+		a.ClearNotification()
 		return nil
 	case "Ctrl+C":
 		// https://github.com/ayn2op/tview/blob/a64fc48d7654432f71922c8b908280cdb525805c/application.go#L153
@@ -213,4 +233,55 @@ func (a *application) showConfirmModal(prompt string, buttons []string, onDone f
 	a.pages.
 		AddAndSwitchToPage(confirmModalPageName, ui.Centered(modal, 0, 0), true).
 		ShowPage(flexPageName)
+}
+
+// ShowNotification displays a temporary notification in the notification area
+func (a *application) ShowNotification(message string) {
+	duration := 30 * time.Second // Default duration
+	if a.cfg.Notifications.Duration > 0 {
+		duration = time.Duration(a.cfg.Notifications.Duration) * time.Second
+	}
+	a.showNotification(message, duration, false)
+}
+
+// ShowPersistentNotification displays a persistent notification that stays until cleared
+func (a *application) ShowPersistentNotification(message string) {
+	a.showNotification(message, 0, true)
+}
+
+// showNotification handles both temporary and persistent notifications
+func (a *application) showNotification(message string, duration time.Duration, persistent bool) {
+	if a.notificationArea != nil {
+		// Clear previous content and add new notification
+		a.notificationArea.Clear()
+		fmt.Fprintf(a.notificationArea, "[::b]Notification:[-::-] %s", message)
+
+		// Track persistent notification state
+		a.hasPersistentNotif = persistent
+
+		// Auto-clear only for temporary notifications
+		if !persistent && duration > 0 {
+			go func() {
+				time.Sleep(duration)
+				if a.notificationArea != nil {
+					a.QueueUpdateDraw(func() {
+						// Only clear if no persistent notification is active
+						if a.notificationArea.GetText(false) != "" && !a.hasPersistentNotif {
+							a.notificationArea.Clear()
+						}
+					})
+				}
+			}()
+		}
+	}
+}
+
+// ClearNotification clears the current notification
+func (a *application) ClearNotification() {
+	if a.notificationArea != nil {
+		a.QueueUpdateDraw(func() {
+			a.notificationArea.Clear()
+			a.hasPersistentNotif = false
+		})
+	}
 }

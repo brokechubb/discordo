@@ -93,6 +93,8 @@ type (
 		AutoExpandFolders bool   `toml:"auto_expand_folders"`
 		Graphics          bool   `toml:"graphics"`
 		GraphicsColor     string `toml:"graphics_color"`
+		WidthProportion   int    `toml:"width_proportion"` // 3 = ~30% width
+		MinWidth          int    `toml:"min_width"`
 	}
 
 	MessagesListTheme struct {

@@ -85,12 +85,16 @@ func (ml *messagesList) setTitle(channel discord.Channel) {
 }
 
 func (ml *messagesList) drawMessages(messages []discord.Message) {
+	slog.Debug("drawMessages called", "message_count", len(messages), "timestamp", time.Now().UnixNano())
 	for _, m := range slices.Backward(messages) {
+		slog.Debug("drawing message", "message_id", m.ID, "author", m.Author.Username, "timestamp", m.Timestamp)
 		ml.drawMessage(m)
 	}
+	slog.Debug("drawMessages completed", "message_count", len(messages), "timestamp", time.Now().UnixNano())
 }
 
 func (ml *messagesList) drawMessage(message discord.Message) {
+	slog.Debug("drawMessage called", "message_id", message.ID, "author", message.Author.Username, "content_length", len(message.Content), "timestamp", time.Now().UnixNano())
 	// Region tags are square brackets that contain a region ID in double quotes
 	// https://pkg.go.dev/github.com/ayn2op/tview#hdr-Regions_and_Highlights
 	fmt.Fprintf(ml, `["%s"]`, message.ID)
@@ -192,6 +196,12 @@ func (ml *messagesList) drawDefaultMessage(message discord.Message) {
 		io.WriteString(ml, " [::d](edited)[::D]")
 	}
 
+	// Draw embeds if present
+	ml.drawEmbeds(message)
+
+	// Draw buttons if present
+	ml.drawButtons(message)
+
 	for _, a := range message.Attachments {
 		fmt.Fprintln(ml)
 
@@ -286,6 +296,9 @@ func (ml *messagesList) onInputCapture(event *tcell.EventKey) *tcell.EventKey {
 		ml.delete()
 	case ml.cfg.Keys.MessagesList.DeleteConfirm:
 		ml.confirmDelete()
+
+	case "Ctrl+A": // Toggle auto-claim
+		ml.toggleAutoClaim()
 	}
 
 	return nil
@@ -597,6 +610,135 @@ func (ml *messagesList) confirmDelete() {
 		[]string{"Yes", "No"},
 		onChoice,
 	)
+}
+
+func (ml *messagesList) drawEmbeds(message discord.Message) {
+	if len(message.Embeds) == 0 {
+		return
+	}
+
+	for i, embed := range message.Embeds {
+		fmt.Fprintln(ml)
+		fmt.Fprintf(ml, "[::d]┌─ Embed %d:[-:-]", i+1)
+
+		if embed.Title != "" {
+			fmt.Fprintln(ml)
+			fmt.Fprintf(ml, "[::d]│[-] [::b]%s[-:-]", tview.Escape(embed.Title))
+		}
+
+		if embed.Description != "" {
+			fmt.Fprintln(ml)
+			// Process description with markdown if enabled
+			desc := []byte(tview.Escape(embed.Description))
+			if ml.cfg.Markdown {
+				ast := discordmd.Parse(desc)
+				fmt.Fprint(ml, "[::d]│[-] ")
+				markdown.DefaultRenderer.Render(ml, desc, ast)
+			} else {
+				fmt.Fprintf(ml, "[::d]│[-] %s", desc)
+			}
+		}
+
+		// Show embed fields
+		for _, field := range embed.Fields {
+			fmt.Fprintln(ml)
+			fmt.Fprintf(ml, "[::d]│[-] [::b]%s:[-] %s", tview.Escape(field.Name), tview.Escape(field.Value))
+			if field.Inline {
+				fmt.Fprint(ml, " [inline]")
+			}
+		}
+
+		// Show footer and timestamp
+		if embed.Footer != nil && embed.Footer.Text != "" {
+			fmt.Fprintln(ml)
+			fmt.Fprintf(ml, "[::d]│[-] [::d]%s[-:-]", tview.Escape(embed.Footer.Text))
+		}
+
+		if embed.Timestamp.IsValid() {
+			fmt.Fprintln(ml)
+			fmt.Fprintf(ml, "[::d]│[-] [::d]%s[-:-]", ml.formatTimestamp(embed.Timestamp))
+		}
+
+		fmt.Fprintln(ml)
+		fmt.Fprint(ml, "[::d]└─────────────────────────────────────────────────────────────[-:-]")
+	}
+}
+
+func (ml *messagesList) drawButtons(message discord.Message) {
+	// Check if this is a tip.cc message
+	const tipCCBotID = 617037497574359050
+	if message.Author.ID != discord.UserID(tipCCBotID) {
+		return
+	}
+
+	// Check if this is an airdrop message
+	isAirdrop := globalInteractionHandler.isTipCCAirdropMessage(message)
+
+	// Check if message has components or is an airdrop message
+	if len(message.Components) == 0 && !isAirdrop {
+		return
+	}
+
+	// Show airdrop indicator
+	if isAirdrop {
+		fmt.Fprintln(ml)
+		fmt.Fprintf(ml, "[::d]✈️ [green]Airdrop detected![-] [-:-]")
+	}
+
+	// Iterate through action rows and display buttons
+	for _, component := range message.Components {
+		if actionRow, ok := component.(*discord.ActionRowComponent); ok {
+			for _, subComponent := range *actionRow {
+				if button, ok := subComponent.(*discord.ButtonComponent); ok {
+					label := button.Label
+					buttonID := string(button.ID())
+
+					// Determine button type for better display
+					buttonType := "🔘"
+					buttonColor := "[yellow]"
+
+					if globalInteractionHandler != nil {
+						if globalInteractionHandler.isTipCCDropButton(buttonID) {
+							buttonType = "✈️"
+							buttonColor = "[green]"
+						}
+					}
+
+					fmt.Fprintln(ml)
+					fmt.Fprintf(ml, "[::d]%s %s%s[-][-:-]",
+						buttonType, buttonColor, label)
+				}
+			}
+		}
+	}
+}
+
+func (ml *messagesList) debugCurrentMessage() {
+	msg, err := ml.selectedMessage()
+	if err != nil {
+		slog.Error("failed to get selected message for debug", "err", err)
+		return
+	}
+
+	// Enable debug temporarily
+	if globalInteractionHandler != nil {
+		originalDebug := globalInteractionHandler.cfg.TipCC.Debug
+		globalInteractionHandler.cfg.TipCC.Debug = true
+		globalInteractionHandler.debugMessageStructure(*msg, app.guildsTree.selectedChannelID)
+		globalInteractionHandler.cfg.TipCC.Debug = originalDebug
+	}
+}
+
+func (ml *messagesList) toggleAutoClaim() {
+	ml.cfg.TipCC.AutoClaim = !ml.cfg.TipCC.AutoClaim
+	status := "disabled"
+	if ml.cfg.TipCC.AutoClaim {
+		status = "enabled"
+	}
+	slog.Info("Auto-claim toggled", "status", status)
+
+	// Show temporary notification in the UI (this would require UI integration)
+	// For now, just log it
 }
 
 func (ml *messagesList) delete() {

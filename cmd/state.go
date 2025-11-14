@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/ayn2op/discordo/internal/http"
 	"github.com/ayn2op/discordo/internal/notifications"
 	"github.com/ayn2op/tview"
 	"github.com/diamondburned/arikawa/v3/api"
+	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/session"
 	"github.com/diamondburned/arikawa/v3/state"
@@ -35,6 +38,9 @@ func openState(token string) error {
 	session := session.NewCustom(id, http.NewClient(token), handler.New())
 	state := state.NewFromSession(session, defaultstore.New())
 	discordState = ningen.FromState(state)
+
+	// Initialize interaction handler
+	globalInteractionHandler = newInteractionHandler(app.cfg)
 
 	// Handlers
 	discordState.AddHandler(onRaw)
@@ -151,6 +157,44 @@ func onMessageCreate(message *gateway.MessageCreateEvent) {
 		app.Draw()
 	}
 
+	// Detect buttons in tip.cc messages and handle drops automatically if enabled
+	if globalInteractionHandler != nil {
+		globalInteractionHandler.detectButtonsInMessage(message.Message, message.ChannelID)
+
+		// Auto-handle tip.cc drops if enabled in config and in focused channel
+		const tipCCBotID = 617037497574359050
+		if message.Author.ID == discord.UserID(tipCCBotID) {
+			if app.cfg.TipCC.AutoClaim && app.guildsTree.selectedChannelID == message.ChannelID {
+				go func() {
+					// Add delay if configured
+					if app.cfg.TipCC.Delay > 0 {
+						time.Sleep(time.Duration(app.cfg.TipCC.Delay) * time.Millisecond)
+					}
+					if err := globalInteractionHandler.handleTipCCDropMessage(message.Message, message.ChannelID); err != nil {
+						slog.Error("failed to handle tip.cc drop", "err", err, "message_id", message.ID)
+					} else {
+						// Show persistent notification when tip.cc drop is detected
+						slog.Info("Tip.cc drop detected in focused channel (user account cannot auto-claim)", "message_id", message.ID, "channel_id", message.ChannelID)
+						app.ShowPersistentNotification(fmt.Sprintf("Tip.cc drop detected in #%s (manual click required)", message.ChannelID))
+					}
+				}()
+			}
+		}
+	}
+
+	// Check for mentions and DMs for on-screen notifications
+	mentions := discordState.MessageMentions(&message.Message)
+	channel, err := discordState.Cabinet.Channel(message.ChannelID)
+	if err == nil {
+		isDM := channel.Type == discord.DirectMessage || channel.Type == discord.GroupDM
+
+		if isDM {
+			app.ShowNotification(fmt.Sprintf("DM from %s: %s", message.Author.Username, truncateString(message.Content, 50)))
+		} else if mentions > 0 {
+			app.ShowNotification(fmt.Sprintf("%s in #%s: %s", message.Author.Username, channel.Name, truncateString(message.Content, 50)))
+		}
+	}
+
 	if err := notifications.Notify(discordState, message, app.cfg); err != nil {
 		slog.Error("Notification failed", "err", err)
 	}
@@ -160,6 +204,23 @@ func onMessageUpdate(message *gateway.MessageUpdateEvent) {
 	if app.guildsTree.selectedChannelID == message.ChannelID {
 		onMessageDelete(&gateway.MessageDeleteEvent{ID: message.ID, ChannelID: message.ChannelID, GuildID: message.GuildID})
 	}
+
+	// Check for button updates in tip.cc messages
+	if globalInteractionHandler != nil {
+		// Get the full message from state
+		fullMessage, err := discordState.Cabinet.Message(message.ChannelID, message.ID)
+		if err == nil {
+			globalInteractionHandler.detectButtonsInMessage(*fullMessage, message.ChannelID)
+		}
+	}
+}
+
+// truncateString truncates a string to a maximum length, adding ... if truncated
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func onMessageDelete(message *gateway.MessageDeleteEvent) {

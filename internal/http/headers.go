@@ -20,7 +20,7 @@ func Headers() stdHttp.Header {
 	headers.Set("X-Debug-Options", "bugReporterEnabled")
 	headers.Set("X-Discord-Locale", string(Locale))
 
-	if superProps, err := superProps(); err == nil {
+	if superProps, err := SuperProperties(); err == nil {
 		headers.Set("X-Super-Properties", superProps)
 	}
 

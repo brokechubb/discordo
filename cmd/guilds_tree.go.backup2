@@ -174,109 +174,34 @@ func (gt *guildsTree) onSelected(node *tview.TreeNode) {
 			return
 		}
 
-		// Check if the channel type does NOT support messages (explicitly exclude problematic types)
-		switch channel.Type {
-		case discord.GuildCategory, discord.GuildForum:
-			// These channel types definitely do not support messages
-			slog.Debug("channel type does not support messages", "channel_type", channel.Type, "channel_name", channel.Name, "channel_id", channel.ID)
+		go discordState.ReadState.MarkRead(channel.ID, channel.LastMessageID)
+
+		messages, err := discordState.Messages(channel.ID, uint(gt.cfg.MessagesLimit))
+		if err != nil {
+			slog.Error("failed to get messages", "err", err, "channel_id", channel.ID, "limit", gt.cfg.MessagesLimit)
 			return
-		case discord.GuildVoice, discord.GuildStageVoice:
-			// Voice channels don't support messages directly, but we should look for associated text channels
-			slog.Debug("voice channel selected, looking for associated text channel", "channel_type", channel.Type, "channel_name", channel.Name, "channel_id", channel.ID)
-
-			// Find associated text channel in the same category or with similar name
-			textChannelID := gt.findAssociatedTextChannel(*channel)
-			if textChannelID.IsValid() {
-				slog.Info("found associated text channel", "voice_channel", channel.Name, "text_channel_id", textChannelID, "voice_channel_id", channel.ID)
-				// Get the text channel and process it
-				textChannel, err := discordState.Cabinet.Channel(textChannelID)
-				if err != nil {
-					slog.Error("failed to get associated text channel", "text_channel_id", textChannelID, "err", err)
-					// Fall back to voice channel behavior
-					app.messagesList.reset()
-					app.messagesList.setTitle(*channel)
-					app.messagesList.drawMessages([]discord.Message{})
-					app.messageInput.SetDisabled(true)
-					app.messageInput.SetPlaceholder("Voice channel - no associated text channel found")
-					gt.selectedChannelID = channel.ID
-					gt.selectedGuildID = channel.GuildID
-					return
-				}
-
-				// Get messages for the text channel and process it
-				var messages []discord.Message
-				var fetchErr error
-				if textChannel.Type != discord.DirectMessage && textChannel.Type != discord.GroupDM {
-					hasViewPerm := discordState.HasPermissions(textChannel.ID, discord.PermissionViewChannel)
-					slog.Debug("permission check result for associated text channel", "channel_id", textChannel.ID, "channel_name", textChannel.Name, "has_view_permission", hasViewPerm)
-					if !hasViewPerm {
-						messages = []discord.Message{}
-						fetchErr = nil
-					} else {
-						messages, fetchErr = discordState.Messages(textChannel.ID, uint(gt.cfg.MessagesLimit))
-					}
-				} else {
-					messages, fetchErr = discordState.Messages(textChannel.ID, uint(gt.cfg.MessagesLimit))
-				}
-
-				if fetchErr != nil {
-					slog.Error("failed to get messages for associated text channel", "err", fetchErr, "channel_id", textChannel.ID)
-					cabinetMessages, cabinetErr := discordState.Cabinet.Messages(textChannel.ID)
-					if cabinetErr != nil {
-						slog.Error("fallback cabinet message fetch also failed for associated text channel", "err", cabinetErr, "channel_id", textChannel.ID)
-						messages = []discord.Message{}
-					} else {
-						messages = cabinetMessages
-					}
-				}
-
-				gt.processTextChannel(*textChannel, messages)
-				return
-			} else {
-				slog.Debug("no associated text channel found for voice channel", "channel_name", channel.Name, "channel_id", channel.ID)
-				// If no associated text channel found, show a message or handle gracefully
-				app.messagesList.reset()
-				app.messagesList.setTitle(*channel)
-				app.messagesList.drawMessages([]discord.Message{})
-				app.messageInput.SetDisabled(true)
-				app.messageInput.SetPlaceholder("Voice channel - no associated text channel found")
-				gt.selectedChannelID = channel.ID
-				gt.selectedGuildID = channel.GuildID
-				return
-			}
-		default:
-			// All other channel types (including text channels) proceed with normal processing
-			slog.Debug("proceeding with message fetch for channel type", "channel_type", channel.Type, "channel_name", channel.Name, "channel_id", channel.ID)
-
-			go discordState.ReadState.MarkRead(channel.ID, channel.LastMessageID)
-
-			messages, err := discordState.Messages(channel.ID, uint(gt.cfg.MessagesLimit))
-			if err != nil {
-				slog.Error("failed to get messages", "err", err, "channel_id", channel.ID, "limit", gt.cfg.MessagesLimit)
-				return
-			}
-
-			if guildID := channel.GuildID; guildID.IsValid() {
-				app.messagesList.requestGuildMembers(guildID, messages)
-			}
-
-			app.messagesList.reset()
-			app.messagesList.setTitle(*channel)
-			app.messagesList.drawMessages(messages)
-			app.messagesList.ScrollToEnd()
-
-			hasNoPerm := channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM && !discordState.HasPermissions(channel.ID, discord.PermissionSendMessages)
-			app.messageInput.SetDisabled(hasNoPerm)
-			if hasNoPerm {
-				app.messageInput.SetPlaceholder("You do not have permission to send messages in this channel.")
-			} else {
-				app.messageInput.SetPlaceholder("Message...")
-				app.SetFocus(app.messageInput)
-			}
-
-			gt.selectedChannelID = channel.ID
-			gt.selectedGuildID = channel.GuildID
 		}
+
+		if guildID := channel.GuildID; guildID.IsValid() {
+			app.messagesList.requestGuildMembers(guildID, messages)
+		}
+
+		app.messagesList.reset()
+		app.messagesList.setTitle(*channel)
+		app.messagesList.drawMessages(messages)
+		app.messagesList.ScrollToEnd()
+
+		hasNoPerm := channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM && !discordState.HasPermissions(channel.ID, discord.PermissionSendMessages)
+		app.messageInput.SetDisabled(hasNoPerm)
+		if hasNoPerm {
+			app.messageInput.SetPlaceholder("You do not have permission to send messages in this channel.")
+		} else {
+			app.messageInput.SetPlaceholder("Message...")
+			app.SetFocus(app.messageInput)
+		}
+
+		gt.selectedChannelID = channel.ID
+		gt.selectedGuildID = channel.GuildID
 	case nil: // Direct messages
 		channels, err := discordState.PrivateChannels()
 		if err != nil {
@@ -441,7 +366,7 @@ func normalizeChannelName(name string) string {
 	// Remove common prefixes and suffixes, special characters, and normalize spaces
 	name = strings.ToLower(name)
 	name = strings.TrimSpace(name)
-
+	
 	// Remove common prefixes/suffixes
 	name = strings.ReplaceAll(name, "voice", "")
 	name = strings.ReplaceAll(name, "text", "")
@@ -453,12 +378,12 @@ func normalizeChannelName(name string) string {
 	name = strings.ReplaceAll(name, "vc", "")
 	name = strings.ReplaceAll(name, "channel", "")
 	name = strings.ReplaceAll(name, "room", "")
-
+	
 	// Remove special characters and normalize spaces/dashes
 	name = strings.ReplaceAll(name, "-", "")
 	name = strings.ReplaceAll(name, "_", "")
 	name = strings.ReplaceAll(name, " ", "")
-
+	
 	return strings.TrimSpace(name)
 }
 
@@ -484,7 +409,7 @@ func isAssociatedNamePattern(voiceName, textName string) bool {
 	}
 
 	// Pattern like "music-voice" and "music" or "music-text"
-	if strings.Contains(voiceName, "-voice") && (strings.HasPrefix(textName, strings.TrimSuffix(voiceName, "-voice")) ||
+	if strings.Contains(voiceName, "-voice") && (strings.HasPrefix(textName, strings.TrimSuffix(voiceName, "-voice")) || 
 		strings.HasPrefix(textName, strings.TrimSuffix(voiceName, "-voice")+"-text")) {
 		return true
 	}
