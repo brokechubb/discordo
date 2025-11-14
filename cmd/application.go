@@ -132,16 +132,14 @@ func (a *application) onPagesInputCapture(event *tcell.EventKey) *tcell.EventKey
 	switch event.Name() {
 	case a.cfg.Keys.FocusGuildsTree:
 		a.messageInput.removeMentionsList()
-		_ = a.focusGuildsTree()
+		a.focusGuildsTree()
 		return nil
 	case a.cfg.Keys.FocusMessagesList:
 		a.messageInput.removeMentionsList()
 		a.SetFocus(a.messagesList)
 		return nil
 	case a.cfg.Keys.FocusMessageInput:
-		if !a.messageInput.GetDisabled() {
-			a.SetFocus(a.messageInput)
-		}
+		a.focusMessageInput()
 		return nil
 	case a.cfg.Keys.FocusPrevious:
 		a.focusPrevious()
@@ -183,6 +181,15 @@ func (a *application) focusGuildsTree() bool {
 	// The guilds tree is not hidden if the number of items is two.
 	if a.flex.GetItemCount() == 2 {
 		a.SetFocus(a.guildsTree)
+		return true
+	}
+
+	return false
+}
+
+func (a *application) focusMessageInput() bool {
+	if !a.messageInput.GetDisabled() {
+		a.SetFocus(a.messageInput)
 		return true
 	}
 
