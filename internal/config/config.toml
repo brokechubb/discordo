@@ -35,7 +35,7 @@ only_on_ping = true
 [tipcc]
 auto_claim = false
 debug = true
-delay_ms = 100
+delay_ms = 1000
 
 # Global shortcuts
 # Esc: Reset message selection or close the channel selection popup.
@@ -49,6 +49,8 @@ focus_next = "Ctrl+L"
 # Hide/show the guilds tree.
 toggle_guilds_tree = "Ctrl+B"
 clear_notification = "Ctrl+N"
+# Toggle Tip.cc autoclaim on/off
+toggle_tipcc_autoclaim = "Ctrl+A"
 quit = "Ctrl+C"
 # Log out and remove the authentication token from keyring.
 # Requires re-login upon restart.
@@ -56,10 +58,10 @@ logout = "Ctrl+D"
 
 # Only while focusing on the guilds tree
 [keys.guilds_tree]
-select_previous = "Rune[k]"
-select_next = "Rune[j]"
-select_first = "Rune[g]"
-select_last = "Rune[G]"
+select_previous = "Up"
+select_next = "Down"
+select_first = "Home"
+select_last = "End"
 # Select the currently highlighted text-based channel or expand a guild or channel.
 select_current = "Enter"
 yank_id = "Rune[i]"
@@ -68,10 +70,10 @@ move_to_parent_node = "Rune[p]"
 
 # Only while focusing on sent messages
 [keys.messages_list]
-select_previous = "Rune[k]"
-select_next = "Rune[j]"
-select_first = "Rune[g]"
-select_last = "Rune[G]"
+select_previous = "Up"
+select_next = "Down"
+select_first = "Home"
+select_last = "End"
 # Select the message reference (reply) of the selected channel.
 select_reply = "Rune[s]"
 # Reply to the selected message.

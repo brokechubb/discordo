@@ -323,15 +323,13 @@ func (gt *guildsTree) onInputCapture(event *tcell.EventKey) *tcell.EventKey {
 		return tcell.NewEventKey(tcell.KeyRune, 'K', tcell.ModNone)
 
 	case gt.cfg.Keys.GuildsTree.SelectPrevious:
-		return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
+		gt.Move(-1)
 	case gt.cfg.Keys.GuildsTree.SelectNext:
-		return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
+		gt.Move(1)
 	case gt.cfg.Keys.GuildsTree.SelectFirst:
 		gt.Move(gt.GetRowCount() * -1)
-		// return tcell.NewEventKey(tcell.KeyHome, 0, tcell.ModNone)
 	case gt.cfg.Keys.GuildsTree.SelectLast:
 		gt.Move(gt.GetRowCount())
-		// return tcell.NewEventKey(tcell.KeyEnd, 0, tcell.ModNone)
 
 	case gt.cfg.Keys.GuildsTree.SelectCurrent:
 		return tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone)

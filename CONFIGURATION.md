@@ -92,13 +92,49 @@ only_on_ping = true
 
 ```toml
 [tipcc]
-# Automatically claim airdrops
+# Automatically claim airdrops (only works in focused channel)
 auto_claim = false
 # Enable debug logging
 debug = true
 # Delay between operations in milliseconds
 delay_ms = 100
 ```
+
+**Important**: Tip.cc autoclaim only works when you have the specific channel focused where the drop occurs. This prevents accidental claims across multiple channels and gives you control over which drops to claim.
+
+#### Tip.cc Usage
+
+1. **Confirmation Dialogs**: Always automatically handled (no configuration needed)
+2. **Drop Claiming**: Set `auto_claim = true` in the `[tipcc]` section for automatic drop claiming
+3. **Focus Channel**: Navigate to and focus the channel where you expect drops (for drops only)
+4. **Monitor Activity**: Keep the channel focused - drop claiming only works in the active channel
+5. **Manual Claims**: For drops in unfocused channels, you'll need to manually click the claim buttons
+
+#### Tip.cc Configuration Options
+
+- **auto_claim**: Enable/disable automatic drop claiming (default: false) - confirmation dialogs always work
+- **debug**: Show detailed logging for tip.cc detection (default: true)
+- **delay_ms**: Delay before claiming to avoid race conditions (default: 100ms)
+
+#### Automatic Confirmation Dialogs
+
+Discordo automatically handles confirmation dialogs **independently of the autoclaim setting**:
+
+- **Always Active**: Confirmation dialogs are always auto-clicked for better user experience
+- **Smart Detection**: Identifies confirmation dialogs by button labels and message content
+- **Confirm Button Auto-click**: Automatically clicks "Confirm", "Accept", "Agree", "Yes", etc.
+- **Cancel Button Safety**: Never auto-clicks "Cancel", "Decline", "No", etc.
+- **Pattern Recognition**: Detects various confirmation patterns like "Are you sure?", "Do you want to?", etc.
+- **Content Analysis**: Checks both message content and embeds for confirmation indicators
+- **Separate Control**: `auto_claim` setting only controls drop claiming, not confirmation dialogs
+
+#### Tip.cc Status Indicator
+
+Discordo displays a persistent Tip.cc status indicator in the top bar:
+- **Green "Auto-claim ON"**: Autoclaim is enabled (focused channel only)
+- **Red "Auto-claim OFF"**: Autoclaim is disabled
+- **Toggle**: Press `Ctrl+A` to toggle autocaim on/off
+- **Notification**: A temporary notification confirms the status change
 
 ## Keybindings
 
@@ -118,6 +154,7 @@ focus_next = "Ctrl+L"
 # UI toggles
 toggle_guilds_tree = "Ctrl+B"
 clear_notification = "Ctrl+N"
+toggle_tipcc_autoclaim = "Ctrl+A"  # Toggle Tip.cc auto-claim
 
 # Actions
 quit = "Ctrl+C"
@@ -128,12 +165,15 @@ logout = "Ctrl+D"  # Removes token from keyring
 
 ```toml
 [keys.guilds_tree]
-select_previous = "Rune[k]"
-select_next = "Rune[j]"
-select_first = "Rune[g]"
-select_last = "Rune[G]"
-select_current = "Enter"  # Open channel or expand guild
-yank_id = "Rune[i]"       # Copy channel ID
+# Navigation - uses arrow keys by default
+select_previous = "Up"     # Previous guild/channel
+select_next = "Down"       # Next guild/channel
+select_first = "Home"      # First guild/channel
+select_last = "End"        # Last guild/channel
+
+# Actions
+select_current = "Enter"   # Open channel or expand guild
+yank_id = "Rune[i]"        # Copy channel ID
 collapse_parent_node = "Rune[-]"
 move_to_parent_node = "Rune[p]"
 ```
@@ -142,11 +182,11 @@ move_to_parent_node = "Rune[p]"
 
 ```toml
 [keys.messages_list]
-# Navigation
-select_previous = "Rune[k]"
-select_next = "Rune[j]"
-select_first = "Rune[g]"
-select_last = "Rune[G]"
+# Navigation - uses arrow keys by default
+select_previous = "Up"       # Previous message
+select_next = "Down"         # Next message
+select_first = "Home"        # First message
+select_last = "End"          # Last message
 
 # Message actions
 select_reply = "Rune[s]"     # View message reference
@@ -340,5 +380,15 @@ url_style = { foreground = "cyan" }
 1. Verify color names are supported by your terminal
 2. Check if your terminal supports TrueColor
 3. Some attributes may not be supported in all terminals
+
+### Tip.cc Autoclaim Not Working
+
+1. **Status Indicator**: Check the Tip.cc status in the top bar - it should show "Auto-claim ON"
+2. **Channel Focus**: Ensure you have the channel with the drop focused - autoclaim only works in the currently active channel
+3. **Toggle Status**: Press `Ctrl+A` to toggle autoclaim on/off if needed
+4. **Configuration**: Verify `auto_claim = true` is set in the `[tipcc]` section
+5. **Delay Settings**: If drops are being missed, try reducing `delay_ms` for faster response
+6. **Debug Mode**: Enable `debug = true` to see detailed logging of tip.cc detection attempts
+7. **Bot Messages**: Autoclaim only works for messages from the official Tip.cc bot (ID: 617037497574359050)
 
 For more help, see the [Contributing Guide](./CONTRIBUTING.md) or join our [Discord server](https://discord.com/invite/VzF9UFn2aB).

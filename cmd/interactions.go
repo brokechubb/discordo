@@ -81,21 +81,37 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 					// Store clickable button info
 					h.storeClickableButton(message.ID, channelID, buttonID, label)
 
+					buttonCategory := "confirmation"
+					if h.isTipCCDropButton(buttonID) {
+						buttonCategory = "drop"
+					}
+
 					slog.Info("Detected tip.cc button",
 						"button_id", buttonID,
 						"label", label,
 						"message_id", message.ID,
+						"category", buttonCategory,
 						"is_airdrop", isAirdropMessage,
+						"auto_claim_enabled", h.cfg.TipCC.AutoClaim,
 					)
 
-					// Auto-click if enabled and this is a drop button
+					// Auto-click logic - confirmation dialogs always work, drops only if auto_claim is enabled
 					shouldAutoClick := false
-					if h.cfg.TipCC.AutoClaim && h.isTipCCDropButton(buttonID) {
+					buttonType := "drop"
+
+					if h.isTipCCDropButton(buttonID) {
+						if h.cfg.TipCC.AutoClaim {
+							shouldAutoClick = true
+							buttonType = "drop"
+						}
+					} else if h.isConfirmationDialogButton(buttonID, label) {
+						// Only auto-click actual confirmation buttons, not all buttons in a confirmation dialog
 						shouldAutoClick = true
+						buttonType = "confirmation"
 					}
 
 					if shouldAutoClick {
-						go h.autoClickButton(message.ID, channelID, buttonID, label, isAirdropMessage)
+						go h.autoClickButton(message.ID, channelID, buttonID, label, isAirdropMessage, buttonType)
 					}
 				}
 			}
@@ -292,6 +308,113 @@ func (h *interactionHandler) isTipCCDropButton(buttonID string) bool {
 	return false
 }
 
+func (h *interactionHandler) isConfirmationDialogButton(buttonID, label string) bool {
+	buttonIDLower := strings.ToLower(buttonID)
+	labelLower := strings.ToLower(label)
+
+	// Check for cancel button patterns (to avoid auto-clicking these)
+	cancelPatterns := []string{
+		"cancel",
+		"decline",
+		"no",
+		"reject",
+		"disagree",
+		"close",
+		"dismiss",
+		"exit",
+		"back",
+	}
+
+	// First check if it's a cancel button - if so, return false
+	for _, pattern := range cancelPatterns {
+		if strings.Contains(buttonIDLower, pattern) || strings.Contains(labelLower, pattern) {
+			slog.Debug("Cancel button pattern detected, skipping auto-click", "pattern", pattern, "button_id", buttonID, "label", label)
+			return false
+		}
+	}
+
+	// Check for confirm button patterns
+	confirmPatterns := []string{
+		"confirm",
+		"accept",
+		"agree",
+		"yes",
+		"ok",
+		"proceed",
+		"continue",
+		"submit",
+		"claim", // Some confirmation dialogs use "claim"
+		"redeem",
+		"activate",
+		"enable",
+		"start",
+		"begin",
+		"execute",
+		"run",
+		"complete",  // Added for completion confirmations
+		"finish",    // Added for finishing actions
+		"done",      // Added for completion dialogs
+		"approve",   // Added for approval confirmations
+		"authorize", // Added for authorization dialogs
+		"verify",    // Added for verification confirmations
+		"validate",  // Added for validation confirmations
+		"allow",     // Added for permission confirmations
+		"grant",     // Added for granting permissions
+	}
+
+	// Then check if it's a confirm button
+	for _, pattern := range confirmPatterns {
+		if strings.Contains(buttonIDLower, pattern) || strings.Contains(labelLower, pattern) {
+			slog.Debug("Confirm button pattern detected", "pattern", pattern, "button_id", buttonID, "label", label)
+			return true
+		}
+	}
+
+	return false
+}
+
+func (h *interactionHandler) isConfirmationDialog(message discord.Message) bool {
+	content := strings.ToLower(message.Content)
+
+	// Check for confirmation dialog indicators in message content
+	confirmationPatterns := []string{
+		"are you sure",
+		"do you want to",
+		"confirm your",
+		"please confirm",
+		"verification required",
+		"authentication needed",
+		"accept terms",
+		"agree to",
+		"proceed with",
+		"continue with",
+		"complete action",
+		"finalize",
+		"confirm selection",
+		"verify action",
+	}
+
+	for _, pattern := range confirmationPatterns {
+		if strings.Contains(content, pattern) {
+			slog.Debug("Confirmation dialog pattern detected in message content", "pattern", pattern, "message_id", message.ID)
+			return true
+		}
+	}
+
+	// Check embeds for confirmation dialog content
+	for _, embed := range message.Embeds {
+		embedText := strings.ToLower(embed.Title + " " + embed.Description)
+		for _, pattern := range confirmationPatterns {
+			if strings.Contains(embedText, pattern) {
+				slog.Debug("Confirmation dialog pattern detected in embed", "pattern", pattern, "message_id", message.ID)
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func (h *interactionHandler) storeClickableButton(messageID discord.MessageID, channelID discord.ChannelID, buttonID, label string) {
 	key := fmt.Sprintf("%d:%d:%s", messageID, channelID, buttonID)
 	clickableButtons[key] = clickableButton{
@@ -314,24 +437,36 @@ func (h *interactionHandler) getClickableButtons(messageID discord.MessageID) []
 	return buttons
 }
 
-func (h *interactionHandler) autoClickButton(messageID discord.MessageID, channelID discord.ChannelID, buttonID, label string, isAirdrop bool) {
+func (h *interactionHandler) autoClickButton(messageID discord.MessageID, channelID discord.ChannelID, buttonID, label string, isAirdrop bool, buttonType ...string) {
 	// Add delay if configured
 	if h.cfg.TipCC.Delay > 0 {
 		time.Sleep(time.Duration(h.cfg.TipCC.Delay) * time.Millisecond)
 	}
 
-	buttonType := "button"
+	btnType := "button"
 	if isAirdrop {
-		buttonType = "airdrop button"
+		btnType = "airdrop button"
+	} else if len(buttonType) > 0 {
+		btnType = buttonType[0]
 	}
 
-	slog.Info("Auto-clicking tip.cc "+buttonType,
-		"button_id", buttonID,
-		"label", label,
-		"message_id", messageID,
-		"delay_ms", h.cfg.TipCC.Delay,
-		"is_airdrop", isAirdrop,
-	)
+	if btnType == "confirmation" {
+		slog.Info("Auto-clicking confirmation dialog (always enabled)",
+			"button_id", buttonID,
+			"label", label,
+			"message_id", messageID,
+			"delay_ms", h.cfg.TipCC.Delay,
+		)
+	} else {
+		slog.Info("Auto-clicking tip.cc "+btnType,
+			"button_id", buttonID,
+			"label", label,
+			"message_id", messageID,
+			"delay_ms", h.cfg.TipCC.Delay,
+			"is_airdrop", isAirdrop,
+			"auto_claim_enabled", h.cfg.TipCC.AutoClaim,
+		)
+	}
 
 	// Get the message to find the actual button component
 	message, err := discordState.Cabinet.Message(channelID, messageID)
@@ -643,6 +778,9 @@ func (h *interactionHandler) handleAirdrop(message discord.Message, channelID di
 func (h *interactionHandler) clickComponentButton(messageID discord.MessageID, channelID discord.ChannelID, button *discord.ButtonComponent) error {
 	buttonID := string(button.ID())
 
+	// Get the current channel to determine if it's in a guild
+	channel, err := discordState.Cabinet.Channel(channelID)
+
 	// Create the interaction payload
 	payload := map[string]interface{}{
 		"type":           3,                    // Component interaction type
@@ -656,11 +794,9 @@ func (h *interactionHandler) clickComponentButton(messageID discord.MessageID, c
 			"component_type": 2, // Button component type
 			"custom_id":      buttonID,
 		},
-		"guild_id": "", // Empty for DMs, will be filled by context if in guild
 	}
 
-	// Get the current channel to determine if it's in a guild
-	channel, err := discordState.Cabinet.Channel(channelID)
+	// Only add guild_id if this is a guild channel (not a DM)
 	if err == nil && channel.GuildID.IsValid() {
 		payload["guild_id"] = channel.GuildID
 	}

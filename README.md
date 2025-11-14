@@ -13,7 +13,7 @@
 - Notifications
 - 2-Factor & QR code authentication
 - Discord-flavored markdown
-- **Tip.cc integration with automated airdrop detection**
+- **Tip.cc integration with automated airdrop detection (focused channel only)**
 
 ## Installation
 
@@ -77,15 +77,47 @@ The token is stored securely in the default OS-specific keyring for subsequent s
 
 ### Key Controls
 
+#### Navigation
+- **Arrow Keys** (↑↓): Navigate guilds, channels, and messages
+- **Home/End**: Jump to first/last item in lists
 - **Ctrl+G**: Focus guilds tree
 - **Ctrl+T**: Focus messages list
 - **Ctrl+Space**: Focus message input
-- **Ctrl+C**: Quit application
-- **Ctrl+D**: Logout and remove token
+
+#### Actions
 - **Enter**: Select channel/send message
 - **Esc**: Cancel current action
+- **Ctrl+A**: Toggle Tip.cc auto-claim on/off
+- **Ctrl+C**: Quit application
+- **Ctrl+D**: Logout and remove token
 
 For complete keybindings and configuration options, see the [Configuration Guide](./CONFIGURATION.md).
+
+### Tip.cc Autoclaim
+
+Discordo includes automated Tip.cc airdrop detection and claiming with a persistent status indicator:
+
+- **Auto-Confirmation**: Always automatically clicks "Confirm" buttons in confirmation dialogs
+- **Drop Claiming**: Toggle automatic drop claiming with Ctrl+A (focused channel only)
+- **Persistent Status**: Real-time autoclaim status displayed in the top bar
+- **Focused Channel Only**: Drop claiming only works in the currently focused channel for safety
+- **One-Touch Toggle**: Press `Ctrl+A` to instantly toggle drop claiming on/off
+- **Visual Feedback**: Green indicator when enabled, red when disabled
+- **Configurable Delay**: Adjustable delay to prevent race conditions
+- **Debug Mode**: Detailed logging for troubleshooting
+- **Manual Override**: Always available to manually claim drops
+- **Smart Detection**: Identifies confirmation dialogs by content and button labels
+
+```toml
+[tipcc]
+auto_claim = true    # Enable autoclaim
+debug = true        # Show detection logs
+delay_ms = 100      # Delay before claiming
+```
+
+**Status Indicator**:
+- 🟢 **Auto-claim ON** (focused channel) - Ready to claim drops + auto-confirmations
+- 🔴 **Auto-claim OFF** - Manual drop claiming + auto-confirmations
 
 ## Configuration
 
@@ -125,6 +157,12 @@ focus_messages_list = "Alt+2"
 # Theme tweaks
 [theme.messages_list]
 mention_style = { foreground = "magenta" }
+
+# Tip.cc autoclaim (focused channel only)
+[tipcc]
+auto_claim = true
+debug = true
+delay_ms = 100
 ```
 
 ## FAQ

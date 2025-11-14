@@ -30,7 +30,8 @@ type application struct {
 	messagesList       *messagesList
 	messageInput       *messageInput
 	notificationArea   *tview.TextView
-	hasPersistentNotif bool // Track if there's a persistent notification
+	hasPersistentNotif bool            // Track if there's a persistent notification
+	tipccStatusArea    *tview.TextView // Tip.cc autoclaim status indicator
 }
 
 func newApplication(cfg *config.Config) *application {
@@ -95,19 +96,42 @@ func (a *application) init() {
 	a.notificationArea.Box = ui.ConfigureBox(a.notificationArea.Box, &a.cfg.Theme)
 	a.notificationArea.SetTitle("Notifications")
 
+	// Create Tip.cc status area
+	a.tipccStatusArea = tview.NewTextView().
+		SetDynamicColors(true).
+		SetWrap(false).
+		SetWordWrap(false)
+	a.tipccStatusArea.Box = ui.ConfigureBox(a.tipccStatusArea.Box, &a.cfg.Theme)
+	a.tipccStatusArea.SetTitle("Tip.cc")
+
+	// Initialize Tip.cc status display
+	if a.cfg.TipCC.AutoClaim {
+		fmt.Fprintf(a.tipccStatusArea, "[::b]Tip.cc:[-::-] [green]Auto-claim ON[-] (drops + confirms)")
+	} else {
+		fmt.Fprintf(a.tipccStatusArea, "[::b]Tip.cc:[-::-] [yellow]Auto-claim OFF[-] (confirms only)")
+	}
+
 	right := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(a.messagesList, 0, 1, false).
 		AddItem(a.messageInput, 3, 1, false)
 
-	// Create a main flex that includes the notification area at the top
+	// Create a top bar with notification and Tip.cc status
+	topBar := tview.NewFlex().
+		SetDirection(tview.FlexColumn).
+		AddItem(a.notificationArea, 0, 3, false). // Notifications take 3/5 of space
+		AddItem(a.tipccStatusArea, 0, 2, false)   // Tip.cc status takes 2/5 of space
+
+	// Use a.flex for the main content area (guilds tree + right panel)
+	a.flex.SetDirection(tview.FlexColumn).
+		AddItem(a.guildsTree, 0, 3, true). // Guilds tree
+		AddItem(right, 0, 7, false)        // Right panel
+
+	// Create main layout with top bar and content
 	mainFlex := tview.NewFlex().
 		SetDirection(tview.FlexRow).
-		AddItem(a.notificationArea, 3, 1, false). // Small notification area at top
-		AddItem(tview.NewFlex().
-			SetDirection(tview.FlexColumn).
-			AddItem(a.guildsTree, 0, 3, true).        // Guilds tree
-			AddItem(right, 0, 7, false), 0, 1, false) // Main content area
+		AddItem(topBar, 3, 1, false). // Top bar with notifications and Tip.cc status
+		AddItem(a.flex, 0, 1, false)  // Main content area using a.flex
 
 	a.pages.AddAndSwitchToPage(flexPageName, mainFlex, true)
 }
@@ -119,6 +143,14 @@ func (a *application) onInputCapture(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	case a.cfg.Keys.ClearNotification:
 		a.ClearNotification()
+		return nil
+	case a.cfg.Keys.ToggleTipCCAutoClaim:
+		// Add safety check to prevent freezing
+		if a.cfg.Keys.ToggleTipCCAutoClaim != "" && a.tipccStatusArea != nil {
+			go func() {
+				a.toggleTipCCAutoClaim()
+			}()
+		}
 		return nil
 	case "Ctrl+C":
 		// https://github.com/ayn2op/tview/blob/a64fc48d7654432f71922c8b908280cdb525805c/application.go#L153
@@ -179,7 +211,8 @@ func (a *application) toggleGuildsTree() {
 
 func (a *application) focusGuildsTree() bool {
 	// The guilds tree is not hidden if the number of items is two.
-	if a.flex.GetItemCount() == 2 {
+	// Check if the guilds tree is visible in the flex container
+	if a.flex != nil && a.flex.GetItemCount() >= 2 {
 		a.SetFocus(a.guildsTree)
 		return true
 	}
@@ -291,4 +324,47 @@ func (a *application) ClearNotification() {
 			a.hasPersistentNotif = false
 		})
 	}
+}
+
+// updateTipCCStatus updates the Tip.cc autoclaim status indicator
+func (a *application) updateTipCCStatus() {
+	if a == nil || a.tipccStatusArea == nil || a.cfg == nil {
+		return
+	}
+
+	// Use a simple update instead of QueueUpdateDraw to avoid potential deadlocks
+	a.tipccStatusArea.Clear()
+
+	if a.cfg.TipCC.AutoClaim {
+		fmt.Fprintf(a.tipccStatusArea, "[::b]Tip.cc:[-::-] [green]Auto-claim ON[-] (drops + confirms)")
+	} else {
+		fmt.Fprintf(a.tipccStatusArea, "[::b]Tip.cc:[-::-] [yellow]Auto-claim OFF[-] (confirms only)")
+	}
+}
+
+// toggleTipCCAutoClaim toggles the Tip.cc autoclaim feature
+func (a *application) toggleTipCCAutoClaim() {
+	if a == nil || a.cfg == nil {
+		return
+	}
+
+	a.cfg.TipCC.AutoClaim = !a.cfg.TipCC.AutoClaim
+	a.updateTipCCStatus()
+
+	status := "disabled"
+	if a.cfg.TipCC.AutoClaim {
+		status = "enabled"
+	}
+
+	// Show notification without using complex UI updates that might cause deadlocks
+	if a.notificationArea != nil {
+		a.notificationArea.Clear()
+		notificationText := fmt.Sprintf("Tip.cc auto-claim %s (Ctrl+A to toggle)", status)
+		if !a.cfg.TipCC.AutoClaim {
+			notificationText += " - confirm dialogs always active"
+		}
+		fmt.Fprintf(a.notificationArea, "[::b]Notification:[-::-] %s", notificationText)
+	}
+
+	slog.Info("Tip.cc auto-claim toggled", "status", status)
 }

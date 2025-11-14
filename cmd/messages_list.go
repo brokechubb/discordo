@@ -296,9 +296,6 @@ func (ml *messagesList) onInputCapture(event *tcell.EventKey) *tcell.EventKey {
 		ml.delete()
 	case ml.cfg.Keys.MessagesList.DeleteConfirm:
 		ml.confirmDelete()
-
-	case "Ctrl+A": // Toggle auto-claim
-		ml.toggleAutoClaim()
 	}
 
 	return nil
@@ -727,18 +724,6 @@ func (ml *messagesList) debugCurrentMessage() {
 		globalInteractionHandler.debugMessageStructure(*msg, app.guildsTree.selectedChannelID)
 		globalInteractionHandler.cfg.TipCC.Debug = originalDebug
 	}
-}
-
-func (ml *messagesList) toggleAutoClaim() {
-	ml.cfg.TipCC.AutoClaim = !ml.cfg.TipCC.AutoClaim
-	status := "disabled"
-	if ml.cfg.TipCC.AutoClaim {
-		status = "enabled"
-	}
-	slog.Info("Auto-claim toggled", "status", status)
-
-	// Show temporary notification in the UI (this would require UI integration)
-	// For now, just log it
 }
 
 func (ml *messagesList) delete() {

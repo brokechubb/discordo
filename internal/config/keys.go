@@ -9,13 +9,14 @@ type (
 	}
 
 	Keys struct {
-		FocusGuildsTree   string `toml:"focus_guilds_tree"`
-		FocusMessagesList string `toml:"focus_messages_list"`
-		FocusMessageInput string `toml:"focus_message_input"`
-		FocusPrevious     string `toml:"focus_previous"`
-		FocusNext         string `toml:"focus_next"`
-		ToggleGuildsTree  string `toml:"toggle_guilds_tree"`
-		ClearNotification string `toml:"clear_notification"`
+		FocusGuildsTree      string `toml:"focus_guilds_tree"`
+		FocusMessagesList    string `toml:"focus_messages_list"`
+		FocusMessageInput    string `toml:"focus_message_input"`
+		FocusPrevious        string `toml:"focus_previous"`
+		FocusNext            string `toml:"focus_next"`
+		ToggleGuildsTree     string `toml:"toggle_guilds_tree"`
+		ClearNotification    string `toml:"clear_notification"`
+		ToggleTipCCAutoClaim string `toml:"toggle_tipcc_autoclaim"`
 
 		GuildsTree   GuildsTreeKeys   `toml:"guilds_tree"`
 		MessagesList MessagesListKeys `toml:"messages_list"`

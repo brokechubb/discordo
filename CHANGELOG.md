@@ -8,11 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Arrow key navigation support for guilds tree and messages list
+- Persistent Tip.cc autoclaim status indicator in top bar
+- Key combination to toggle Tip.cc autoclaim (Ctrl+A)
+- Visual feedback for Tip.cc autoclaim status (green/red indicators)
+- Automatic confirmation dialog handling (auto-clicks Confirm buttons, always enabled)
+- Smart confirmation dialog detection by content and button labels
+- Safety features to avoid auto-clicking Cancel/Decline buttons
+- Separate control: Confirmation dialogs work independently of auto_claim setting
 - Comprehensive documentation system
 - CONTRIBUTING.md with development guidelines
 - CONFIGURATION.md with detailed configuration options
 - Enhanced command-line option documentation
 - Cross-references between documentation files
+
+### Changed
+- Default navigation keybindings changed from vim-style (j/k/g/G) to arrow keys (↑↓/Home/End)
+- Updated documentation to reflect new default navigation controls
+- Clarified Tip.cc autoclaim scope (focused channel only) in documentation
 
 ### Changed
 - Improved documentation structure and organization
