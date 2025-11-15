@@ -59,9 +59,10 @@ jobs:
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libx11-dev
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libasound2-dev
 
       - name: Set build variables
+        shell: bash
         run: |
           if [ "${{ runner.os }}" = "Windows" ]; then
             echo "ARTIFACT_NAME=discordo.exe" >> $GITHUB_ENV
@@ -72,14 +73,12 @@ jobs:
           fi
 
       - name: Build for ${{ matrix.arch }}
+        shell: bash
         run: |
           if [ "${{ matrix.arch }}" = "arm64" ]; then
             if [ "${{ runner.os }}" = "Linux" ]; then
-              # Cross-compilation for ARM64 - may have some limitations
-              GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }} || {
-                echo "ARM64 cross-compilation failed, trying with CGO_ENABLED=0"
-                GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
-              }
+              # Cross-compilation for ARM64 - disable CGO to avoid dependency issues
+              GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             elif [ "${{ runner.os }}" = "macOS" ]; then
               GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             fi
