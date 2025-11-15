@@ -2,8 +2,6 @@
 
 ### Discordo is a lightweight, secure, and feature-rich Discord terminal client with **TIP.CC** autoclaim support.
 
-![Preview](.github/preview.png)
-
 ## Features
 
 - Lightweight and fast terminal-based Discord client
@@ -100,6 +98,7 @@ The token is stored securely in the default OS-specific keyring for subsequent s
 ### Key Controls
 
 #### Navigation
+
 - **Arrow Keys** (↑↓): Navigate guilds, channels, and messages
 - **Home/End**: Jump to first/last item in lists
 - **Ctrl+G**: Focus guilds tree
@@ -107,6 +106,7 @@ The token is stored securely in the default OS-specific keyring for subsequent s
 - **Ctrl+Space**: Focus message input
 
 #### Actions
+
 - **Enter**: Select channel/send message
 - **Esc**: Cancel current action
 - **Ctrl+A**: Toggle Tip.cc auto-claim on/off
@@ -142,6 +142,7 @@ delay_ms = 100      # Delay before claiming
 ```
 
 **Status Indicator**:
+
 - 🟢 **Auto-claim ON** (focused channel) - Ready to claim drops + auto-confirmations
 - 🔴 **Auto-claim OFF** - Manual drop claiming + auto-confirmations
 
@@ -241,6 +242,7 @@ Discordo is open source and welcomes contributions! The project is written in Go
 ### Current Branch: `tip-cc-autoclaim`
 
 This branch includes the latest features:
+
 - Tip.cc autoclaim functionality
 - Arrow key navigation (replacing vim-style keys)
 - Enhanced notification system
