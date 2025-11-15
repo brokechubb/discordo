@@ -20,13 +20,27 @@
 
 ## Installation
 
-### Building from source
+### Option 1: Download Pre-compiled Binary (Recommended)
+
+Download the appropriate binary for your platform from the [latest release](https://github.com/ayn2op/discordo/releases/latest):
+
+| Platform | Binary | Command |
+|----------|--------|---------|
+| Linux AMD64 | `discordo-linux-amd64` | `wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-linux-amd64 && chmod +x discordo-linux-amd64` |
+| Linux ARM64 | `discordo-linux-arm64` | `wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-linux-arm64 && chmod +x discordo-linux-arm64` |
+| Windows | `discordo-windows-amd64.exe` | Download from releases page |
+| macOS Intel | `discordo-macos-amd64` | `wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-macos-amd64 && chmod +x discordo-macos-amd64` |
+| macOS Apple Silicon | `discordo-macos-arm64` | `wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-macos-arm64 && chmod +x discordo-macos-arm64` |
+
+### Option 2: Building from Source
 
 ```bash
 git clone -b tip-cc-autoclaim https://github.com/ayn2op/discordo
 cd discordo
 go build .
 ```
+
+For detailed installation instructions and release information, see the [Release Guide](./RELEASE.md).
 
 ### Dependencies
 
@@ -326,6 +340,10 @@ For development commands and coding standards, see [AGENTS.md](./AGENTS.md).
 ## Changelog
 
 For version history and upcoming features, see the [CHANGELOG.md](./CHANGELOG.md).
+
+## Releases
+
+For pre-compiled binaries and installation instructions, see the [Release Guide](./RELEASE.md).
 
 ### Recent Changes (tip-cc-autoclaim branch)
 

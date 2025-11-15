@@ -1,0 +1,196 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+      prerelease:
+        description: 'Is this a prerelease?'
+        required: true
+        default: 'false'
+        type: boolean
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux
+          - os: ubuntu-latest
+            arch: amd64
+            artifact_name: discordo
+            asset_name: discordo-linux-amd64
+          - os: ubuntu-latest
+            arch: arm64
+            artifact_name: discordo
+            asset_name: discordo-linux-arm64
+          # Windows
+          - os: windows-latest
+            arch: amd64
+            artifact_name: discordo.exe
+            asset_name: discordo-windows-amd64.exe
+          # macOS
+          - os: macos-latest
+            arch: amd64
+            artifact_name: discordo
+            asset_name: discordo-macos-amd64
+          - os: macos-13
+            arch: arm64
+            artifact_name: discordo
+            asset_name: discordo-macos-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev
+
+      - name: Set build variables
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            echo "ARTIFACT_NAME=discordo.exe" >> $GITHUB_ENV
+            echo "ASSET_NAME=discordo-windows-${{ matrix.arch }}.exe" >> $GITHUB_ENV
+          else
+            echo "ARTIFACT_NAME=discordo" >> $GITHUB_ENV
+            echo "ASSET_NAME=discordo-${{ runner.os }}-${{ matrix.arch }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build for ${{ matrix.arch }}
+        run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            if [ "${{ runner.os }}" = "Linux" ]; then
+              # Cross-compilation for ARM64 - may have some limitations
+              GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }} || {
+                echo "ARM64 cross-compilation failed, trying with CGO_ENABLED=0"
+                GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+              }
+            elif [ "${{ runner.os }}" = "macOS" ]; then
+              GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+            fi
+          else
+            go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+          fi
+
+      - name: Strip binary (Unix)
+        if: runner.os != 'Windows'
+        run: strip ${{ env.ARTIFACT_NAME }}
+
+      - name: Upload artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET_NAME }}
+          path: ${{ env.ARTIFACT_NAME }}
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          cd artifacts
+          for dir in */; do
+            cd "$dir"
+            if [[ -f discordo.exe ]]; then
+              mv discordo.exe "../release-assets/$(basename "$dir")"
+            elif [[ -f discordo ]]; then
+              mv discordo "../release-assets/$(basename "$dir")"
+            fi
+            cd ..
+          done
+          cd ..
+          ls -la release-assets/
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get version from tag or input
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          
+          # Create changelog from CHANGELOG.md
+          if [[ -f CHANGELOG.md ]]; then
+            # Extract unreleased section and recent changes
+            awk '/^## \[Unreleased\]/{flag=1; next} /^## \[/{flag=0} flag && /^### /{print}' CHANGELOG.md > changelog.txt || echo "No unreleased changes found." > changelog.txt
+            echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+            cat changelog.txt >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "## Installation" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "### Download the appropriate binary for your platform:" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "- **Linux AMD64**: \`discordo-linux-amd64\`" >> $GITHUB_OUTPUT
+            echo "- **Linux ARM64**: \`discordo-linux-arm64\`" >> $GITHUB_OUTPUT
+            echo "- **Windows AMD64**: \`discordo-windows-amd64.exe\`" >> $GITHUB_OUTPUT
+            echo "- **macOS Intel**: \`discordo-macos-amd64\`" >> $GITHUB_OUTPUT
+            echo "- **macOS Apple Silicon**: \`discordo-macos-arm64\`" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "### Quick Start" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "1. Download the binary for your platform" >> $GITHUB_OUTPUT
+            echo "2. Make it executable (Linux/macOS): \`chmod +x discordo-*\`" >> $GITHUB_OUTPUT
+            echo "3. Run: \`./discordo-linux-amd64\` (or appropriate binary)" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "For detailed instructions, see the [README](https://github.com/ayn2op/discordo/blob/${VERSION}/README.md)" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+            echo "Release $VERSION" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || github.event.inputs.version }}
+          name: Release ${{ github.ref_name || github.event.inputs.version }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(github.ref_name || github.event.inputs.version, '-') }}
+          files: |
+            release-assets/*
+
+      - name: Generate release summary
+        run: |
+          echo "## 🚀 Release Created Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ github.ref_name || github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL**: ${{ steps.create_release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Assets" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ls -la release-assets/ | while read line; do
+            echo "- $line" >> $GITHUB_STEP_SUMMARY
+          done

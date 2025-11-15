@@ -54,6 +54,13 @@ This document provides an overview of all available documentation for Discordo a
 - Migration guides
 - Development timeline
 
+### [RELEASE.md](./RELEASE.md)
+**Release Management Guide**
+- Automated release process
+- Cross-platform binary builds
+- Installation instructions
+- Version management
+
 ## Documentation Structure
 
 ```
@@ -61,6 +68,7 @@ Documentation/
 ├── User Guides
 │   ├── README.md           # Overview and quick start
 │   ├── CONFIGURATION.md    # Detailed configuration
+│   ├── RELEASE.md          # Release and installation guide
 │   └── FAQ                 # Common questions
 ├── Developer Resources
 │   ├── CONTRIBUTING.md     # Development setup
@@ -76,6 +84,7 @@ Documentation/
 ### For Users
 - **New to Discordo?** Start with [README.md](./README.md)
 - **Need to customize?** See [CONFIGURATION.md](./CONFIGURATION.md)
+- **Want to install?** Check [RELEASE.md](./RELEASE.md)
 - **Having issues?** Check the [FAQ](./README.md#faq)
 
 ### For Developers
