@@ -91,7 +91,8 @@ func (a *application) init() {
 	a.notificationArea = tview.NewTextView().
 		SetDynamicColors(true).
 		SetRegions(true).
-		SetWrap(true).
+		SetWrap(false).
+		SetWordWrap(false).
 		SetScrollable(false)
 	a.notificationArea.Box = ui.ConfigureBox(a.notificationArea.Box, &a.cfg.Theme)
 	a.notificationArea.SetTitle("Notifications")
@@ -106,9 +107,9 @@ func (a *application) init() {
 
 	// Initialize Tip.cc status display
 	if a.cfg.TipCC.AutoClaim {
-		fmt.Fprintf(a.tipccStatusArea, "[::b]Tip.cc:[-::-] [green]Auto-claim ON[-] (drops + confirms)")
+		fmt.Fprintf(a.tipccStatusArea, "[::b][green]Auto-claim ON[-]")
 	} else {
-		fmt.Fprintf(a.tipccStatusArea, "[::b]Tip.cc:[-::-] [yellow]Auto-claim OFF[-] (confirms only)")
+		fmt.Fprintf(a.tipccStatusArea, "[::b][yellow]Auto-claim OFF[-]")
 	}
 
 	right := tview.NewFlex().
@@ -119,8 +120,8 @@ func (a *application) init() {
 	// Create a top bar with notification and Tip.cc status
 	topBar := tview.NewFlex().
 		SetDirection(tview.FlexColumn).
-		AddItem(a.notificationArea, 0, 3, false). // Notifications take 3/5 of space
-		AddItem(a.tipccStatusArea, 0, 2, false)   // Tip.cc status takes 2/5 of space
+		AddItem(a.notificationArea, 0, 4, false). // Notifications take 4/5 of space
+		AddItem(a.tipccStatusArea, 0, 1, false)   // Tip.cc status takes 1/5 of space
 
 	// Use a.flex for the main content area (guilds tree + right panel)
 	a.flex.SetDirection(tview.FlexColumn).
@@ -294,7 +295,17 @@ func (a *application) showNotification(message string, duration time.Duration, p
 	if a.notificationArea != nil {
 		// Clear previous content and add new notification
 		a.notificationArea.Clear()
+
+		// Truncate message to fit on one line (reserve space for "Notification: " prefix)
+		maxMessageLen := 80 // Adjust based on typical terminal width
+		if len(message) > maxMessageLen {
+			message = message[:maxMessageLen] + "..."
+		}
+
 		fmt.Fprintf(a.notificationArea, "[::b]Notification:[-::-] %s", message)
+
+		// Scroll to top to ensure first line is always visible
+		a.notificationArea.ScrollToBeginning()
 
 		// Track persistent notification state
 		a.hasPersistentNotif = persistent
@@ -304,12 +315,11 @@ func (a *application) showNotification(message string, duration time.Duration, p
 			go func() {
 				time.Sleep(duration)
 				if a.notificationArea != nil {
-					a.QueueUpdateDraw(func() {
-						// Only clear if no persistent notification is active
-						if a.notificationArea.GetText(false) != "" && !a.hasPersistentNotif {
-							a.notificationArea.Clear()
-						}
-					})
+					// Use direct update instead of QueueUpdateDraw to avoid potential deadlocks
+					// Only clear if no persistent notification is active
+					if a.notificationArea.GetText(false) != "" && !a.hasPersistentNotif {
+						a.notificationArea.Clear()
+					}
 				}
 			}()
 		}
@@ -319,10 +329,10 @@ func (a *application) showNotification(message string, duration time.Duration, p
 // ClearNotification clears the current notification
 func (a *application) ClearNotification() {
 	if a.notificationArea != nil {
-		a.QueueUpdateDraw(func() {
-			a.notificationArea.Clear()
-			a.hasPersistentNotif = false
-		})
+		// Use direct update instead of QueueUpdateDraw to avoid potential deadlocks
+		a.notificationArea.Clear()
+		a.notificationArea.ScrollToBeginning()
+		a.hasPersistentNotif = false
 	}
 }
 
@@ -336,9 +346,9 @@ func (a *application) updateTipCCStatus() {
 	a.tipccStatusArea.Clear()
 
 	if a.cfg.TipCC.AutoClaim {
-		fmt.Fprintf(a.tipccStatusArea, "[::b]Tip.cc:[-::-] [green]Auto-claim ON[-] (drops + confirms)")
+		fmt.Fprintf(a.tipccStatusArea, "[::b][green]Auto-claim ON[-]")
 	} else {
-		fmt.Fprintf(a.tipccStatusArea, "[::b]Tip.cc:[-::-] [yellow]Auto-claim OFF[-] (confirms only)")
+		fmt.Fprintf(a.tipccStatusArea, "[::b][yellow]Auto-claim OFF[-]")
 	}
 }
 
@@ -360,10 +370,15 @@ func (a *application) toggleTipCCAutoClaim() {
 	if a.notificationArea != nil {
 		a.notificationArea.Clear()
 		notificationText := fmt.Sprintf("Tip.cc auto-claim %s (Ctrl+A to toggle)", status)
-		if !a.cfg.TipCC.AutoClaim {
-			notificationText += " - confirm dialogs always active"
+
+		// Truncate to fit on one line
+		maxMessageLen := 80
+		if len(notificationText) > maxMessageLen {
+			notificationText = notificationText[:maxMessageLen] + "..."
 		}
+
 		fmt.Fprintf(a.notificationArea, "[::b]Notification:[-::-] %s", notificationText)
+		a.notificationArea.ScrollToBeginning()
 	}
 
 	slog.Info("Tip.cc auto-claim toggled", "status", status)

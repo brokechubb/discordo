@@ -160,7 +160,7 @@ The token is stored securely in the default OS-specific keyring for subsequent s
 - **Ctrl+B**: Toggle guilds tree visibility
 - **Ctrl+C**: Quit application
 - **Ctrl+D**: Logout and remove token
-- **Ctrl+N**: Clear notifications
+- **Ctrl+K**: Clear notifications
 - **Ctrl+H**: Focus previous widget
 - **Ctrl+L**: Focus next widget
 
@@ -190,7 +190,7 @@ delay_ms = 100      # Delay before claiming
 
 **Status Indicator**:
 
-- 🟢 **Auto-claim ON** (focused channel) - Ready to claim drops + auto-confirmations
+- 🟢 **Auto-claim ON** (focused channel) - Ready to claim drops and auto-confirmations
 - 🔴 **Auto-claim OFF** - Manual drop claiming + auto-confirmations
 
 ## Configuration
@@ -349,7 +349,7 @@ For pre-compiled binaries and installation instructions, see the [Release Guide]
 
 - **Fixed**: DM conversation user coloring - users now display with proper colored usernames
 - **Added**: Configurable DM user color theme setting
-- **Fixed**: Ctrl+N freeze issue when mentions list is visible
+- **Fixed**: Key binding conflict - changed clear notifications from Ctrl+N to Ctrl+K
 - **Added**: Persistent Tip.cc autoclaim status indicator
 - **Changed**: Default navigation from vim-style (j/k) to arrow keys
 - **Enhanced**: Configuration system with better documentation

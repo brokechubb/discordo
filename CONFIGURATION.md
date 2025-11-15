@@ -165,7 +165,7 @@ focus_next = "Ctrl+L"
 
 # UI toggles
 toggle_guilds_tree = "Ctrl+B"
-clear_notification = "Ctrl+N"
+clear_notification = "Ctrl+K"
 toggle_tipcc_autoclaim = "Ctrl+A"  # Toggle Tip.cc auto-claim
 
 # Actions

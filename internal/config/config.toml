@@ -51,7 +51,7 @@ focus_previous = "Ctrl+H"
 focus_next = "Ctrl+L"
 # Hide/show the guilds tree.
 toggle_guilds_tree = "Ctrl+B"
-clear_notification = "Ctrl+N"
+clear_notification = "Ctrl+K"
 # Toggle Tip.cc autoclaim on/off
 toggle_tipcc_autoclaim = "Ctrl+A"
 quit = "Ctrl+C"
