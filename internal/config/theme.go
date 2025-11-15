@@ -101,6 +101,7 @@ type (
 		ReplyIndicator     string       `toml:"reply_indicator"`
 		ForwardedIndicator string       `toml:"forwarded_indicator"`
 		AuthorStyle        StyleWrapper `toml:"author_style"`
+		DMUserColor        string       `toml:"dm_user_color"`
 		MentionStyle       StyleWrapper `toml:"mention_style"`
 		EmojiStyle         StyleWrapper `toml:"emoji_style"`
 		URLStyle           StyleWrapper `toml:"url_style"`

@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Smart confirmation dialog detection by content and button labels
 - Safety features to avoid auto-clicking Cancel/Decline buttons
 - Separate control: Confirmation dialogs work independently of auto_claim setting
+- **DM user coloring**: Users in direct messages and group DMs now have colored usernames
+- **Configurable DM user color**: New `dm_user_color` theme setting for customizing DM username colors
+- **Enhanced theme system**: Improved color consistency across different conversation types
 - Comprehensive documentation system
 - CONTRIBUTING.md with development guidelines
 - CONFIGURATION.md with detailed configuration options
@@ -36,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+- **DM conversation user coloring**: Users in DM conversations now display with proper colored usernames instead of uncolored text
+- **Color consistency**: Improved color application logic for better visibility across different terminal themes
 
 ### Security
 
@@ -101,6 +106,32 @@ Discordo is currently in heavy development with frequent breaking changes. Users
 
 ### From 0.0.x to 0.1.0
 No migration required - initial release.
+
+### Recent Updates (tip-cc-autoclaim branch)
+
+#### DM User Coloring Feature
+**What changed**: Added colored usernames for DM conversations with configurable color setting.
+
+**Migration required**: No - automatic with defaults.
+
+**Optional configuration**:
+```toml
+[theme.messages_list]
+dm_user_color = "green"  # Customize DM username color
+```
+
+**Action needed**: None unless you want to customize the color.
+
+#### Navigation Changes
+**What changed**: Default navigation changed from vim-style (j/k) to arrow keys.
+
+**Migration required**: No - old keys may still work but are deprecated.
+
+**Action needed**: Update muscle memory to use arrow keys (↑↓).
+
+### General Update Process
+
+For regular updates, see the [updating instructions](./CONFIGURATION.md#upgrading-and-updating).
 
 ### Future Migrations
 When breaking changes are introduced, migration instructions will be provided in this section.

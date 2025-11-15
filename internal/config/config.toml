@@ -146,6 +146,7 @@ min_width = 25
 [theme.messages_list]
 reply_indicator = ">"
 forwarded_indicator = "<"
+dm_user_color = "green"
 
 mention_style = { foreground = "blue" }
 emoji_style = { foreground = "green" }

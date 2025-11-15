@@ -152,14 +152,14 @@ func (ml *messagesList) drawAuthor(message discord.Message) {
 	if err == nil {
 		slog.Debug("channel info", "channel_id", app.guildsTree.selectedChannelID, "channel_type", channel.Type, "is_dm", channel.Type == discord.DirectMessage, "is_group_dm", channel.Type == discord.GroupDM)
 		if channel.Type == discord.DirectMessage || channel.Type == discord.GroupDM {
-			// This is a DM, use cyan color
-			colorName = "cyan"
-			slog.Debug("using cyan for DM", "author", name)
+			// This is a DM, use the configured DM user color
+			colorName = ml.cfg.Theme.MessagesList.DMUserColor
+			slog.Debug("using DM user color", "author", name, "channel_type", channel.Type, "color", colorName)
 		} else if message.GuildID.IsValid() {
 			member, err := discordState.Cabinet.Member(message.GuildID, message.Author.ID)
 			if err != nil {
 				slog.Error("failed to get member from state", "guild_id", message.GuildID, "member_id", message.Author.ID, "err", err)
-				colorName = "cyan"
+				colorName = ml.cfg.Theme.MessagesList.DMUserColor
 			} else {
 				if member.Nick != "" {
 					name = member.Nick
@@ -173,17 +173,17 @@ func (ml *messagesList) drawAuthor(message discord.Message) {
 					colorName = color.String()
 					slog.Debug("using role color", "author", name, "color", color.String())
 				} else {
-					colorName = "cyan"
-					slog.Debug("no role color, using cyan", "author", name)
+					colorName = ml.cfg.Theme.MessagesList.DMUserColor
+					slog.Debug("no role color, using DM user color", "author", name, "color", colorName)
 				}
 			}
 		} else {
-			colorName = "cyan"
-			slog.Debug("no guild id, using cyan", "author", name, "guild_id", message.GuildID)
+			colorName = ml.cfg.Theme.MessagesList.DMUserColor
+			slog.Debug("no guild id, using DM user color", "author", name, "guild_id", message.GuildID, "color", colorName)
 		}
 	} else {
 		slog.Error("failed to get channel", "channel_id", app.guildsTree.selectedChannelID, "err", err)
-		colorName = "cyan"
+		colorName = ml.cfg.Theme.MessagesList.DMUserColor
 	}
 
 	slog.Debug("using color name", "author", name, "color_name", colorName)

@@ -11,6 +11,7 @@
 - Desktop notifications with sound support
 - 2-Factor & QR code authentication
 - Discord-flavored markdown rendering
+- **Colored usernames in DM conversations** for better visibility
 - **Tip.cc integration with automated airdrop detection (focused channel only)**
 - Arrow key navigation (vim-style keys deprecated)
 - Persistent status indicators
@@ -45,6 +46,38 @@ go build .
 
 - Notification daemon (for desktop notifications)
 - Keyring service (for secure token storage)
+
+## Updating Discordo
+
+Discordo is actively developed with frequent updates. Keep your installation current:
+
+### Quick Update (Recommended)
+
+```bash
+cd discordo
+git pull origin tip-cc-autoclaim
+go build .
+```
+
+### Fresh Installation
+
+```bash
+# Backup your configuration first
+cp ~/.config/discordo/config.toml ~/.config/discordo/config.toml.backup
+
+# Get the latest version
+rm -rf discordo
+git clone -b tip-cc-autoclaim https://github.com/ayn2op/discordo
+cd discordo
+go build .
+
+# Restore configuration if needed
+cp ~/.config/discordo/config.toml.backup ~/.config/discordo/config.toml
+```
+
+### Configuration Updates
+
+New features may add configuration options. Your existing configuration will continue to work with new defaults. See the [Configuration Guide](./CONFIGURATION.md#upgrading-and-updating) for detailed migration instructions.
 
 ## Usage
 
@@ -184,6 +217,7 @@ focus_messages_list = "Alt+2"
 # Theme tweaks
 [theme.messages_list]
 mention_style = { foreground = "magenta" }
+dm_user_color = "green"  # Color for DM usernames
 
 # Tip.cc autoclaim (focused channel only)
 [tipcc]
@@ -295,6 +329,8 @@ For version history and upcoming features, see the [CHANGELOG.md](./CHANGELOG.md
 
 ### Recent Changes (tip-cc-autoclaim branch)
 
+- **Fixed**: DM conversation user coloring - users now display with proper colored usernames
+- **Added**: Configurable DM user color theme setting
 - **Fixed**: Ctrl+N freeze issue when mentions list is visible
 - **Added**: Persistent Tip.cc autoclaim status indicator
 - **Changed**: Default navigation from vim-style (j/k) to arrow keys

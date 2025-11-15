@@ -286,6 +286,7 @@ min_width = 25  # Minimum width in characters
 [theme.messages_list]
 reply_indicator = ">"
 forwarded_indicator = "<"
+dm_user_color = "green"  # Color for usernames in DM conversations
 
 # Message element styling
 mention_style = { foreground = "blue" }
@@ -293,6 +294,12 @@ emoji_style = { foreground = "green" }
 url_style = { foreground = "blue" }
 attachment_style = { foreground = "yellow" }
 ```
+
+**DM User Color:**
+- `dm_user_color`: Color used for usernames in direct messages and group DMs
+- Default: `"green"` for better visibility across terminal themes
+- Can be set to any valid tview/tcell color name (see [Available Colors](#available-colors))
+- This color is used when no role colors are available (DMs don't have guild roles)
 
 ### Mentions List
 
@@ -370,6 +377,175 @@ active_style = { foreground = "cyan", attributes = "bold" }
 mention_style = { foreground = "magenta" }
 url_style = { foreground = "cyan" }
 ```
+
+## Upgrading and Updating
+
+### Keeping Discordo Updated
+
+Discordo is actively developed with frequent updates. Here's how to stay current:
+
+#### Method 1: Building from Source (Recommended)
+
+```bash
+# Navigate to your discordo directory
+cd discordo
+
+# Pull the latest changes
+git pull origin tip-cc-autoclaim
+
+# Rebuild the application
+go build .
+
+# Run the updated version
+./discordo
+```
+
+#### Method 2: Fresh Clone
+
+```bash
+# Backup your configuration (optional)
+cp ~/.config/discordo/config.toml ~/.config/discordo/config.toml.backup
+
+# Remove old directory and clone fresh
+rm -rf discordo
+git clone -b tip-cc-autoclaim https://github.com/ayn2op/discordo
+cd discordo
+go build .
+
+# Restore your configuration if needed
+cp ../config.toml.backup ~/.config/discordo/config.toml
+```
+
+### Configuration Migration
+
+When updating Discordo, your configuration file should continue to work. However, new features may add additional configuration options.
+
+#### Automatic Migration
+
+- New configuration options use built-in defaults
+- Existing settings remain unchanged
+- No manual intervention required for most updates
+
+#### Manual Updates
+
+Some updates may require manual configuration changes:
+
+```toml
+# Example: Adding new DM user color setting (added in recent update)
+[theme.messages_list]
+# Add this line if you want to customize DM user colors
+dm_user_color = "green"  # Default is "green"
+```
+
+### Version-Specific Migration
+
+#### Recent Changes Requiring Attention
+
+**DM User Coloring Feature**:
+- **New setting**: `dm_user_color` in `[theme.messages_list]` section
+- **Default value**: `"green"` (automatically applied)
+- **Purpose**: Colors usernames in DM and group DM conversations for better visibility
+- **Action required**: None - feature works automatically with default color
+- **Optional customization**: Add the setting only if you want to change the color
+
+#### Customizing DM User Colors
+
+If you want to change the default DM user color from green to something else:
+
+```toml
+[theme.messages_list]
+# Change DM username color to any valid terminal color
+dm_user_color = "cyan"     # Light blue
+dm_user_color = "magenta"  # Purple
+dm_user_color = "yellow"   # Yellow
+dm_user_color = "white"    # White
+dm_user_color = "red"      # Red
+```
+
+**Available colors**: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, plus bright variants like `bright_blue`, `bright_green`, etc.
+
+#### Migration Examples
+
+**Before update** (no DM user coloring):
+```toml
+[theme.messages_list]
+reply_indicator = ">"
+mention_style = { foreground = "blue" }
+```
+
+**After update** (automatic - no changes needed):
+- DM usernames will appear in green color automatically
+- Existing configuration continues to work unchanged
+
+**With customization** (optional):
+```toml
+[theme.messages_list]
+reply_indicator = ">"
+dm_user_color = "cyan"  # Custom color for DM usernames
+mention_style = { foreground = "blue" }
+```
+
+**Navigation Changes**:
+- Arrow keys are now default (replaced vim-style j/k)
+- Old vim-style keys are deprecated but may still work
+- Action: Update muscle memory to use arrow keys
+
+### Backup and Restore
+
+#### Before Updating
+
+```bash
+# Backup configuration
+cp ~/.config/discordo/config.toml ~/.config/discordo/config.toml.$(date +%Y%m%d)
+
+# Backup entire config directory (recommended)
+cp -r ~/.config/discordo ~/.config/discordo.backup.$(date +%Y%m%d)
+```
+
+#### After Updating Issues
+
+```bash
+# Restore configuration if needed
+cp ~/.config/discordo/config.toml.backup.YYYYMMDD ~/.config/discordo/config.toml
+
+# Or restore entire config directory
+rm -rf ~/.config/discordo
+mv ~/.config/discordo.backup.YYYYMMDD ~/.config/discordo
+```
+
+### Checking Your Version
+
+```bash
+# Check git commit for latest changes
+cd discordo
+git log --oneline -5
+
+# Check if you're on the correct branch
+git branch
+git status
+```
+
+### Breaking Changes
+
+Discordo is in active development, so breaking changes may occur:
+
+- **Configuration Format**: Major changes will be documented in CHANGELOG.md
+- **Keybindings**: Changes are announced in release notes
+- **Dependencies**: Go version requirements may change
+
+**Mitigation Strategy**:
+1. Always backup configuration before updating
+2. Read CHANGELOG.md for breaking changes
+3. Test updates in a safe environment first
+4. Join the Discord server for community support
+
+### Update Frequency
+
+- **Active Development**: Expect updates multiple times per week
+- **Stable Releases**: Less frequent, more thoroughly tested
+- **Critical Fixes**: Released as needed
+
+**Recommendation**: Update weekly or when you encounter issues that may be fixed in newer versions.
 
 ## Troubleshooting
 
