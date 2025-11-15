@@ -116,7 +116,16 @@ jobs:
         run: |
           mkdir -p release-assets
           cd artifacts
-          find . -name "discordo*" -type f -exec mv {} release-assets/ \;
+          # Extract binaries from artifact zip files
+          for dir in */; do
+            cd "$dir"
+            if [[ -f discordo.exe ]]; then
+              mv discordo.exe "../../release-assets/$(basename "$dir")"
+            elif [[ -f discordo ]]; then
+              mv discordo "../../release-assets/$(basename "$dir")"
+            fi
+            cd ..
+          done
           cd ..
           ls -la release-assets/
 
