@@ -736,7 +736,7 @@ func (h *interactionHandler) handleTipCCDropMessage(message discord.Message, cha
 			if actionRow, ok := component.(*discord.ActionRowComponent); ok {
 				for _, subComponent := range *actionRow {
 					if button, ok := subComponent.(*discord.ButtonComponent); ok {
-						slog.Info("Tip.cc button available (manual click required for user accounts)",
+						slog.Info("Tip.cc button available",
 							"button_label", button.Label,
 							"button_id", button.ID(),
 							"channel_id", channelID,
@@ -753,7 +753,7 @@ func (h *interactionHandler) handleTipCCDropMessage(message discord.Message, cha
 // handleAirdrop handles tip.cc airdrop messages
 // handleAirdrop handles tip.cc airdrop messages
 func (h *interactionHandler) handleAirdrop(message discord.Message, channelID discord.ChannelID) error {
-	slog.Info("Detected tip.cc airdrop (manual click required for user accounts)", "message_id", message.ID)
+	slog.Info("Detected tip.cc airdrop", "message_id", message.ID)
 
 	// For user accounts, we cannot automatically click airdrop buttons
 	// Log the button information for awareness
@@ -895,7 +895,7 @@ func (h *interactionHandler) handleMathDrop(message discord.Message, channelID d
 
 // handleTriviaDrop handles tip.cc trivia drop messages
 func (h *interactionHandler) handleTriviaDrop(message discord.Message, channelID discord.ChannelID, embed discord.Embed) error {
-	slog.Info("Detected tip.cc trivia drop (manual click required for user accounts)", "message_id", message.ID)
+	slog.Info("Detected tip.cc trivia drop", "message_id", message.ID)
 
 	// For trivia, we need to find the correct answer button
 	// For user accounts, we cannot automatically click trivia buttons
@@ -921,7 +921,7 @@ func (h *interactionHandler) handleTriviaDrop(message discord.Message, channelID
 
 // handleRedpacket handles tip.cc redpacket messages
 func (h *interactionHandler) handleRedpacket(message discord.Message, channelID discord.ChannelID) error {
-	slog.Info("Detected tip.cc redpacket (manual click required for user accounts)", "message_id", message.ID)
+	slog.Info("Detected tip.cc redpacket", "message_id", message.ID)
 
 	// For redpackets, we need to click the envelope button
 	// For user accounts, we cannot automatically click redpacket buttons

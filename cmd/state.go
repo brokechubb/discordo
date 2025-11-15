@@ -175,7 +175,7 @@ func onMessageCreate(message *gateway.MessageCreateEvent) {
 					} else {
 						// Show persistent notification when tip.cc drop is detected
 						slog.Info("Tip.cc drop detected in focused channel (user account cannot auto-claim)", "message_id", message.ID, "channel_id", message.ChannelID)
-						app.ShowPersistentNotification(fmt.Sprintf("Tip.cc drop detected in #%s (manual click required)", message.ChannelID))
+						app.ShowPersistentNotification(fmt.Sprintf("Tip.cc drop detected in #%s", message.ChannelID))
 					}
 				}()
 			}
