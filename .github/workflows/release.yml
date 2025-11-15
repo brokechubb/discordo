@@ -87,7 +87,7 @@ jobs:
           fi
 
       - name: Strip binary (Unix)
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.arch != 'arm64'
         run: strip ${{ env.ARTIFACT_NAME }}
 
       - name: Upload artifact
