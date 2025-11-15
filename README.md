@@ -360,7 +360,7 @@ For pre-compiled binaries and installation instructions, see the [Release Guide]
 - 📖 [Documentation Index](./DOCS.md) - Complete documentation overview
 - ⚙️ [Configuration Guide](./CONFIGURATION.md) - Detailed configuration options
 - 🛠️ [Contributing Guide](./CONTRIBUTING.md) - Development and contribution guidelines
-- 💬 [Discord Server](https://discord.com/invite/VzF9UFn2aB) - Community support
+- 💬 [Discord Server](https://discord.gg/EbFP3Uxx) - Community support
 - 🐛 [Issue Tracker](https://github.com/ayn2op/discordo/issues) - Bug reports and feature requests
 
 > [!IMPORTANT]

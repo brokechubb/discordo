@@ -121,7 +121,7 @@ Feature requests are welcome! Please:
 
 ## Community
 
-- Join our [Discord server](https://discord.com/invite/VzF9UFn2aB) for discussions
+- Join our [Discord server](https://discord.gg/EbFP3Uxx) for discussions
 - Check [GitHub Issues](https://github.com/ayn2op/discordo/issues) for known problems
 - Review [Pull Requests](https://github.com/ayn2op/discordo/pulls) to see what's being worked on
 

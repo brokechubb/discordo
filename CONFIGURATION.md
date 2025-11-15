@@ -579,4 +579,4 @@ Discordo is in active development, so breaking changes may occur:
 6. **Debug Mode**: Enable `debug = true` to see detailed logging of tip.cc detection attempts
 7. **Bot Messages**: Autoclaim only works for messages from the official Tip.cc bot (ID: 617037497574359050)
 
-For more help, see the [Contributing Guide](./CONTRIBUTING.md) or join our [Discord server](https://discord.com/invite/VzF9UFn2aB).
+For more help, see the [Contributing Guide](./CONTRIBUTING.md) or join our [Discord server](https://discord.gg/EbFP3Uxx).

@@ -141,7 +141,7 @@ When breaking changes are introduced, migration instructions will be provided in
 For questions about changes or upgrade issues:
 - Check the [Configuration Guide](./CONFIGURATION.md)
 - Review [Contributing Guidelines](./CONTRIBUTING.md)
-- Join our [Discord server](https://discord.com/invite/VzF9UFn2aB)
+- Join our [Discord server](https://discord.gg/EbFP3Uxx)
 - Open an issue on [GitHub](https://github.com/ayn2op/discordo/issues)
 
 ---

@@ -143,7 +143,7 @@ See the [Contributing Guide](./CONTRIBUTING.md) for the full contribution proces
 - [Arikawa Discord Library](https://github.com/diamondburned/arikawa)
 
 ### Community
-- [Discord Server](https://discord.com/invite/VzF9UFn2aB)
+- [Discord Server](https://discord.gg/EbFP3Uxx)
 - [GitHub Issues](https://github.com/ayn2op/discordo/issues)
 - [GitHub Discussions](https://github.com/ayn2op/discordo/discussions)
 
