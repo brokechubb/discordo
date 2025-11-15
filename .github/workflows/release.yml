@@ -77,8 +77,8 @@ jobs:
         run: |
           if [ "${{ matrix.arch }}" = "arm64" ]; then
             if [ "${{ runner.os }}" = "Linux" ]; then
-              # Cross-compilation for ARM64 - disable CGO to avoid dependency issues
-              GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+              # Cross-compilation for ARM64 - disable CGO and audio to avoid dependency issues
+              GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -tags=noaudio -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             elif [ "${{ runner.os }}" = "macOS" ]; then
               GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             fi
