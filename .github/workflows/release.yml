@@ -116,15 +116,7 @@ jobs:
         run: |
           mkdir -p release-assets
           cd artifacts
-          for dir in */; do
-            cd "$dir"
-            if [[ -f discordo.exe ]]; then
-              mv discordo.exe "../release-assets/$(basename "$dir")"
-            elif [[ -f discordo ]]; then
-              mv discordo "../release-assets/$(basename "$dir")"
-            fi
-            cd ..
-          done
+          find . -name "discordo*" -type f -exec mv {} release-assets/ \;
           cd ..
           ls -la release-assets/
 
