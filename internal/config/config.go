@@ -27,8 +27,9 @@ type (
 	}
 
 	Sound struct {
-		Enabled    bool `toml:"enabled"`
-		OnlyOnPing bool `toml:"only_on_ping"`
+		Enabled    bool   `toml:"enabled"`
+		OnlyOnPing bool   `toml:"only_on_ping"`
+		File       string `toml:"file"`
 	}
 
 	TipCC struct {

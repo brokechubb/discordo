@@ -31,6 +31,9 @@ duration = 0
 [notifications.sound]
 enabled = true
 only_on_ping = true
+# Path to custom sound file (supports .wav, .mp3, .ogg, etc.)
+# Leave empty to use system default beep
+file = ""
 
 [tipcc]
 auto_claim = false
@@ -134,9 +137,9 @@ auto_expand_folders = true
 # Give tree-like shape
 graphics = true
 graphics_color = "default"
-# Width proportion for 30% screen width (3:7 ratio, default: 3)
+# Width proportion for 25% screen width (2.5:7.5 ratio, default: 2)
 # Use 2 for ~22%, 3 for ~30%, 4 for ~40%, etc.
-width_proportion = 3
+width_proportion = 2
 # Minimum width in characters (0 = no minimum)
 min_width = 25
 

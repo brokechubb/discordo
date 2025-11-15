@@ -86,6 +86,18 @@ duration = 0
 enabled = true
 # Only play sound for mentions/pings
 only_on_ping = true
+# Path to custom sound file (supports .wav, .mp3, .ogg, etc.)
+# Leave empty to use system default beep
+file = ""
+```
+
+**Sound Configuration:**
+- `enabled`: Enable/disable notification sounds
+- `only_on_ping`: Only play sounds for mentions/pings
+- `file`: Path to custom sound file
+  - Supported formats: `.mp3`, `.ogg` (Linux/Windows), `.wav`, `.aiff` (macOS)
+  - Use absolute paths or relative paths from where you run discordo
+  - Falls back to system default beep if file doesn't exist
 ```
 
 ### Tip.cc Integration
@@ -262,9 +274,9 @@ auto_expand_folders = true
 graphics = true  # Tree-like structure with lines
 graphics_color = "default"
 
-# Width proportion (3 = ~30% of screen width)
+# Width proportion (2 = ~22% of screen width)
 # Common values: 2 (~22%), 3 (~30%), 4 (~40%)
-width_proportion = 3
+width_proportion = 2
 min_width = 25  # Minimum width in characters
 ```
 

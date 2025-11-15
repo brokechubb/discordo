@@ -6,31 +6,47 @@
 
 ## Features
 
-- Lightweight
-- Configurable
-- Mouse & clipboard support
-- Attachments
-- Notifications
+- Lightweight and fast terminal-based Discord client
+- Highly configurable with TOML configuration files
+- Mouse & clipboard support with image paste capability
+- File attachments and media preview
+- Desktop notifications with sound support
 - 2-Factor & QR code authentication
-- Discord-flavored markdown
+- Discord-flavored markdown rendering
 - **Tip.cc integration with automated airdrop detection (focused channel only)**
+- Arrow key navigation (vim-style keys deprecated)
+- Persistent status indicators
+- Cross-platform support (Windows, macOS, Linux)
+- Secure token storage in OS keyring
 
 ## Installation
 
 ### Building from source
 
 ```bash
-git clone https://github.com/ayn2op/discordo
+git clone -b tip-cc-autoclaim https://github.com/ayn2op/discordo
 cd discordo
 go build .
 ```
 
-### Wayland clipboard support
+### Dependencies
+
+#### Wayland clipboard support
 
 `x11-dev` is required for X11 clipboard compatibility:
 
 - Ubuntu: `apt install xwayland`
 - Arch Linux: `pacman -S xorg-xwayland`
+
+#### Go requirements
+
+- Go 1.21 or later
+- Git for cloning the repository
+
+#### Optional dependencies
+
+- Notification daemon (for desktop notifications)
+- Keyring service (for secure token storage)
 
 ## Usage
 
@@ -60,6 +76,12 @@ Flags:
         Log level: debug, info, warn, error (default: "info")
 ```
 
+### Environment Variables
+
+- `DISCORDO_TOKEN`: Your Discord authentication token
+- `XDG_CONFIG_HOME`: Override default config directory (Unix)
+- `HOME`: User home directory (used for config paths)
+
 ### Token Authentication
 
 If you prefer to use an authentication token:
@@ -88,8 +110,12 @@ The token is stored securely in the default OS-specific keyring for subsequent s
 - **Enter**: Select channel/send message
 - **Esc**: Cancel current action
 - **Ctrl+A**: Toggle Tip.cc auto-claim on/off
+- **Ctrl+B**: Toggle guilds tree visibility
 - **Ctrl+C**: Quit application
 - **Ctrl+D**: Logout and remove token
+- **Ctrl+N**: Clear notifications
+- **Ctrl+H**: Focus previous widget
+- **Ctrl+L**: Focus next widget
 
 For complete keybindings and configuration options, see the [Configuration Guide](./CONFIGURATION.md).
 
@@ -212,6 +238,15 @@ secret-tool store --label="Discord Token" service discordo username token
 
 Discordo is open source and welcomes contributions! The project is written in Go and uses the tview library for the terminal UI.
 
+### Current Branch: `tip-cc-autoclaim`
+
+This branch includes the latest features:
+- Tip.cc autoclaim functionality
+- Arrow key navigation (replacing vim-style keys)
+- Enhanced notification system
+- Improved configuration options
+- Bug fixes and performance improvements
+
 ### Contributing
 
 We welcome all types of contributions:
@@ -223,10 +258,29 @@ We welcome all types of contributions:
 
 See the [Contributing Guide](./CONTRIBUTING.md) for detailed development setup and guidelines.
 
+### Development Commands
+
+```bash
+# Build the application
+go build .
+
+# Run the application
+go run .
+
+# Format code
+go fmt ./...
+
+# Run static analysis
+go vet ./...
+
+# Run tests (when available)
+go test ./...
+```
+
 ### Building from Source
 
 ```bash
-git clone https://github.com/ayn2op/discordo
+git clone -b tip-cc-autoclaim https://github.com/ayn2op/discordo
 cd discordo
 go build .
 ```
@@ -236,6 +290,14 @@ For development commands and coding standards, see [AGENTS.md](./AGENTS.md).
 ## Changelog
 
 For version history and upcoming features, see the [CHANGELOG.md](./CHANGELOG.md).
+
+### Recent Changes (tip-cc-autoclaim branch)
+
+- **Fixed**: Ctrl+N freeze issue when mentions list is visible
+- **Added**: Persistent Tip.cc autoclaim status indicator
+- **Changed**: Default navigation from vim-style (j/k) to arrow keys
+- **Enhanced**: Configuration system with better documentation
+- **Improved**: Error handling and stability
 
 ## Support
 

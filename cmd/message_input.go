@@ -137,11 +137,9 @@ func (mi *messageInput) onInputCapture(event *tcell.EventKey) *tcell.EventKey {
 		if app.pages.GetVisibile(mentionsListPageName) {
 			switch event.Name() {
 			case mi.cfg.Keys.MentionsList.Up:
-				mi.mentionsList.InputHandler()(tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone), nil)
-				return nil
+				return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
 			case mi.cfg.Keys.MentionsList.Down:
-				mi.mentionsList.InputHandler()(tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone), nil)
-				return nil
+				return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
 			}
 		}
 

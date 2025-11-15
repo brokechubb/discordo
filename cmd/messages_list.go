@@ -145,27 +145,49 @@ func (ml *messagesList) drawTimestamps(ts discord.Timestamp) {
 
 func (ml *messagesList) drawAuthor(message discord.Message) {
 	name := message.Author.DisplayOrUsername()
-	foreground := tcell.ColorDefault
-	if message.GuildID.IsValid() {
-		member, err := discordState.Cabinet.Member(message.GuildID, message.Author.ID)
-		if err != nil {
-			slog.Error("failed to get member from state", "guild_id", message.GuildID, "member_id", message.Author.ID, "err", err)
-		} else {
-			if member.Nick != "" {
-				name = member.Nick
-			}
+	var colorName string
 
-			color, ok := state.MemberColor(member, func(id discord.RoleID) *discord.Role {
-				r, _ := discordState.Cabinet.Role(message.GuildID, id)
-				return r
-			})
-			if ok {
-				foreground = tcell.GetColor(color.String())
+	// Check if this is a DM channel
+	channel, err := discordState.Cabinet.Channel(app.guildsTree.selectedChannelID)
+	if err == nil {
+		slog.Debug("channel info", "channel_id", app.guildsTree.selectedChannelID, "channel_type", channel.Type, "is_dm", channel.Type == discord.DirectMessage, "is_group_dm", channel.Type == discord.GroupDM)
+		if channel.Type == discord.DirectMessage || channel.Type == discord.GroupDM {
+			// This is a DM, use cyan color
+			colorName = "cyan"
+			slog.Debug("using cyan for DM", "author", name)
+		} else if message.GuildID.IsValid() {
+			member, err := discordState.Cabinet.Member(message.GuildID, message.Author.ID)
+			if err != nil {
+				slog.Error("failed to get member from state", "guild_id", message.GuildID, "member_id", message.Author.ID, "err", err)
+				colorName = "cyan"
+			} else {
+				if member.Nick != "" {
+					name = member.Nick
+				}
+
+				color, ok := state.MemberColor(member, func(id discord.RoleID) *discord.Role {
+					r, _ := discordState.Cabinet.Role(message.GuildID, id)
+					return r
+				})
+				if ok {
+					colorName = color.String()
+					slog.Debug("using role color", "author", name, "color", color.String())
+				} else {
+					colorName = "cyan"
+					slog.Debug("no role color, using cyan", "author", name)
+				}
 			}
+		} else {
+			colorName = "cyan"
+			slog.Debug("no guild id, using cyan", "author", name, "guild_id", message.GuildID)
 		}
+	} else {
+		slog.Error("failed to get channel", "channel_id", app.guildsTree.selectedChannelID, "err", err)
+		colorName = "cyan"
 	}
 
-	fmt.Fprintf(ml, "[%s::b]%s[-::B] ", foreground, name)
+	slog.Debug("using color name", "author", name, "color_name", colorName)
+	fmt.Fprintf(ml, "[%s::b]%s:[-::B] ", colorName, name)
 }
 
 func (ml *messagesList) drawContent(message discord.Message) {
@@ -616,7 +638,7 @@ func (ml *messagesList) drawEmbeds(message discord.Message) {
 
 	for i, embed := range message.Embeds {
 		fmt.Fprintln(ml)
-		fmt.Fprintf(ml, "[::d]┌─ Embed %d:[-:-]", i+1)
+		fmt.Fprintf(ml, "[::d]┌── Embed Message %d[-:-]", i+1)
 
 		if embed.Title != "" {
 			fmt.Fprintln(ml)
@@ -657,7 +679,7 @@ func (ml *messagesList) drawEmbeds(message discord.Message) {
 		}
 
 		fmt.Fprintln(ml)
-		fmt.Fprint(ml, "[::d]└─────────────────────────────────────────────────────────────[-:-]")
+		fmt.Fprint(ml, "[::d]└───────────────────[-:-]")
 	}
 }
 
