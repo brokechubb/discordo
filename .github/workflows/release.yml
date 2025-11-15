@@ -85,7 +85,12 @@ jobs:
               GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             fi
           else
-            go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+            # For Linux AMD64, use noaudio tag to avoid CGO dependency issues
+            if [ "${{ runner.os }}" = "Linux" ]; then
+              go build -tags=noaudio -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+            else
+              go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+            fi
           fi
 
       - name: Strip binary (Unix)
