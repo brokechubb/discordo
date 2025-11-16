@@ -3,6 +3,10 @@
 package notifications
 
 import (
+	"os"
+	"os/exec"
+	"runtime"
+
 	"github.com/ayn2op/discordo/internal/config"
 	"github.com/gen2brain/beeep"
 )
@@ -32,7 +36,29 @@ func sendDesktopNotification(title string, message string, image string, playSou
 }
 
 func playSoundFile(filePath string) error {
-	// Audio disabled for cross-compilation builds
-	// Fall back to system beep
+	// Audio disabled for cross-compilation builds, but try to play using system commands
+	if _, err := os.Stat(filePath); err != nil {
+		return err
+	}
+
+	// Try to play the sound file using system commands
+	switch runtime.GOOS {
+	case "linux":
+		// Try using aplay, paplay, or mpg123 for Linux
+		commands := []string{"paplay", "aplay", "mpg123", "ogg123"}
+		for _, cmd := range commands {
+			if err := exec.Command(cmd, filePath).Run(); err == nil {
+				return nil
+			}
+		}
+	case "windows":
+		// On Windows, try using PowerShell to play the sound
+		psCmd := "(New-Object Media.SoundPlayer '" + filePath + "').PlaySync();"
+		if err := exec.Command("powershell", "-c", psCmd).Run(); err == nil {
+			return nil
+		}
+	}
+
+	// Fall back to system beep if sound file couldn't be played
 	return beeep.Beep(beeep.DefaultFreq, 500)
 }
