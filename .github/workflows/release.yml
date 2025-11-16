@@ -61,7 +61,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libasound2-dev pkg-config
+          sudo apt-get install -y libx11-dev libasound2-dev pkg-config alsa-utils pulseaudio-utils
 
       - name: Set build variables
         shell: bash
@@ -85,9 +85,9 @@ jobs:
               GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             fi
           else
-            # For Linux AMD64, enable audio since dependencies are installed
+            # For Linux AMD64, use noaudio tag but with enhanced system command support
             if [ "${{ runner.os }}" = "Linux" ]; then
-              go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+              go build -tags=noaudio -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             else
               go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             fi
