@@ -26,16 +26,16 @@ Download the appropriate binary for your platform from the [latest release](http
 
 | Platform | Binary | Command |
 |----------|--------|---------|
-| Linux AMD64 | `discordo-linux-amd64` | `wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-linux-amd64 && chmod +x discordo-linux-amd64` |
-| Linux ARM64 | `discordo-linux-arm64` | `wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-linux-arm64 && chmod +x discordo-linux-arm64` |
-| Windows | `discordo-windows-amd64.exe` | Download from releases page |
-| macOS Intel | `discordo-macos-amd64` | `wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-macos-amd64 && chmod +x discordo-macos-amd64` |
-| macOS Apple Silicon | `discordo-macos-arm64` | `wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-macos-arm64 && chmod +x discordo-macos-arm64` |
+| Linux AMD64 | `discordo-Linux-amd64` | `wget https://github.com/brokechubb/discordo/releases/latest/download/discordo-Linux-amd64 && chmod +x discordo-Linux-amd64` |
+| Linux ARM64 | `discordo-Linux-arm64` | `wget https://github.com/brokechubb/discordo/releases/latest/download/discordo-Linux-arm64 && chmod +x discordo-Linux-arm64` |
+| Windows | `discordo-windows-amd64.exe` | `wget https://github.com/brokechubb/discordo/releases/latest/download/discordo-windows-amd64.exe` |
+| macOS Intel | `discordo-macOS-amd64` | `wget https://github.com/brokechubb/discordo/releases/latest/download/discordo-macOS-amd64 && chmod +x discordo-macOS-amd64` |
+| macOS Apple Silicon | `discordo-macOS-arm64` | `wget https://github.com/brokechubb/discordo/releases/latest/download/discordo-macOS-arm64 && chmod +x discordo-macOS-arm64` |
 
 ### Option 2: Building from Source
 
 ```bash
-git clone -b tip-cc-autoclaim https://github.com/ayn2op/discordo
+git clone https://github.com/brokechubb/discordo
 cd discordo
 go build .
 ```
@@ -69,7 +69,7 @@ Discordo is actively developed with frequent updates. Keep your installation cur
 
 ```bash
 cd discordo
-git pull origin tip-cc-autoclaim
+git pull origin main
 go build .
 ```
 
@@ -81,7 +81,7 @@ cp ~/.config/discordo/config.toml ~/.config/discordo/config.toml.backup
 
 # Get the latest version
 rm -rf discordo
-git clone -b tip-cc-autoclaim https://github.com/ayn2op/discordo
+git clone https://github.com/brokechubb/discordo
 cd discordo
 go build .
 
@@ -287,7 +287,7 @@ secret-tool store --label="Discord Token" service discordo username token
 
 Discordo is open source and welcomes contributions! The project is written in Go and uses the tview library for the terminal UI.
 
-### Current Branch: `tip-cc-autoclaim`
+### Current Branch: `main`
 
 This branch includes the latest features:
 
@@ -330,7 +330,7 @@ go test ./...
 ### Building from Source
 
 ```bash
-git clone -b tip-cc-autoclaim https://github.com/ayn2op/discordo
+git clone https://github.com/brokechubb/discordo
 cd discordo
 go build .
 ```
@@ -345,7 +345,7 @@ For version history and upcoming features, see the [CHANGELOG.md](./CHANGELOG.md
 
 For pre-compiled binaries and installation instructions, see the [Release Guide](./RELEASE.md).
 
-### Recent Changes (tip-cc-autoclaim branch)
+### Recent Changes (main branch)
 
 - **Fixed**: DM conversation user coloring - users now display with proper colored usernames
 - **Added**: Configurable DM user color theme setting
