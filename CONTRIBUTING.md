@@ -29,11 +29,11 @@ Thank you for your interest in contributing to Discordo! This document provides 
 ### Building and Running
 
 ```bash
-# Build the project
-go build .
+# Build the project (Linux default - no audio dependencies)
+go build -tags noaudio .
 
-# Run the project
-go run .
+# Run the project (Linux default - no audio dependencies)
+go run -tags noaudio .
 
 # Format code
 go fmt ./...

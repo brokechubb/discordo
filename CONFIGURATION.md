@@ -393,8 +393,8 @@ cd discordo
 # Pull the latest changes
 git pull origin tip-cc-autoclaim
 
-# Rebuild the application
-go build .
+# Rebuild the application (Linux default - no audio dependencies)
+go build -tags noaudio .
 
 # Run the updated version
 ./discordo
@@ -410,7 +410,7 @@ cp ~/.config/discordo/config.toml ~/.config/discordo/config.toml.backup
 rm -rf discordo
 git clone https://github.com/brokechubb/discordo
 cd discordo
-go build .
+go build -tags noaudio .
 
 # Restore your configuration if needed
 cp ../config.toml.backup ~/.config/discordo/config.toml

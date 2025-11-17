@@ -37,10 +37,17 @@ Download the appropriate binary for your platform from the [latest release](http
 ```bash
 git clone https://github.com/brokechubb/discordo
 cd discordo
-go build .
+go build -tags noaudio .
 ```
 
 For detailed installation instructions and release information, see the [Release Guide](./RELEASE.md).
+
+### Build Tags
+
+Discordo supports different build configurations:
+
+- **Linux (default)**: `go build -tags noaudio .` - Disables audio dependencies for better compatibility
+- **Full audio**: `go build .` - Includes audio support (use on platforms with audio libraries)
 
 ### Dependencies
 
@@ -70,7 +77,7 @@ Discordo is actively developed with frequent updates. Keep your installation cur
 ```bash
 cd discordo
 git pull origin main
-go build .
+go build -tags noaudio .
 ```
 
 ### Fresh Installation
@@ -83,7 +90,7 @@ cp ~/.config/discordo/config.toml ~/.config/discordo/config.toml.backup
 rm -rf discordo
 git clone https://github.com/brokechubb/discordo
 cd discordo
-go build .
+go build -tags noaudio .
 
 # Restore configuration if needed
 cp ~/.config/discordo/config.toml.backup ~/.config/discordo/config.toml
@@ -311,11 +318,11 @@ See the [Contributing Guide](./CONTRIBUTING.md) for detailed development setup a
 ### Development Commands
 
 ```bash
-# Build the application
-go build .
+# Build the application (Linux default - no audio dependencies)
+go build -tags noaudio .
 
-# Run the application
-go run .
+# Run the application (Linux default - no audio dependencies)
+go run -tags noaudio .
 
 # Format code
 go fmt ./...
@@ -332,7 +339,7 @@ go test ./...
 ```bash
 git clone https://github.com/brokechubb/discordo
 cd discordo
-go build .
+go build -tags noaudio .
 ```
 
 For development commands and coding standards, see [AGENTS.md](./AGENTS.md).

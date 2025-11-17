@@ -142,11 +142,11 @@ Use prereleases for testing and development:
    - Update documentation dates
 
 3. **Test thoroughly**:
-   ```bash
-   go test ./...
-   go build .
-   ./discordo --help
-   ```
+    ```bash
+    go test ./...
+    go build -tags noaudio .
+    ./discordo --help
+    ```
 
 4. **Commit changes**:
    ```bash
@@ -196,7 +196,7 @@ Use prereleases for testing and development:
 **Solutions**:
 1. Check workflow logs for specific errors
 2. Ensure all dependencies are declared in go.mod
-3. Test build locally: `GOOS=linux GOARCH=arm64 go build .`
+3. Test build locally: `GOOS=linux GOARCH=arm64 go build -tags noaudio .`
 
 ### Release Issues
 
@@ -217,11 +217,11 @@ If automated release fails, you can create a manual release:
 1. **Build locally**:
    ```bash
    # Build for current platform
-   go build -ldflags "-s -w" -o discordo .
+go build -tags noaudio -ldflags "-s -w" -o discordo .
    
-   # Cross-compile examples
-   GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o discordo.exe .
-   GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o discordo-linux .
+# Cross-compile examples
+    GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o discordo.exe .
+    GOOS=linux GOARCH=amd64 go build -tags noaudio -ldflags "-s -w" -o discordo-linux .
    ```
 
 2. **Create manual release**:
@@ -252,12 +252,13 @@ strategy:
 Binaries are built with optimization flags:
 
 ```bash
-go build -ldflags "-s -w" -o discordo .
+go build -tags noaudio -ldflags "-s -w" -o discordo .
 ```
 
+- `-tags noaudio`: Disable audio dependencies (Linux default)
 - `-s`: Omit symbol table
 - `-w`: Omit DWARF symbol table
-- Result: Smaller binary sizes
+- Result: Smaller binary sizes with better compatibility
 
 ### Artifact Management
 

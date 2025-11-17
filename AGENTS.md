@@ -1,12 +1,16 @@
 # Discordo - Agent Guidelines
 
 ## Build Commands
-- **Build**: `go build .`
-- **Run**: `go run .`
+- **Build**: `go build -tags noaudio .` (Linux default)
+- **Run**: `go run -tags noaudio .` (Linux default)
 - **Format**: `go fmt ./...`
 - **Vet**: `go vet ./...`
 - **Test**: `go test ./...` (no tests currently exist)
 - **Single test**: `go test -run TestName ./pkg/path`
+
+### Build Tags
+- **noaudio**: Default for Linux builds, disables audio dependencies
+- **Full audio**: Omit `-tags noaudio` for platforms with audio support
 
 ## Code Style Guidelines
 
