@@ -5,8 +5,6 @@ All notable changes to Discordo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ### Added
 - Arrow key navigation support for guilds tree and messages list
 - Persistent Tip.cc autoclaim status indicator in top bar
@@ -24,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CONFIGURATION.md with detailed configuration options
 - Enhanced command-line option documentation
 - Cross-references between documentation files
+- **Kitty terminal support**: Automatic detection and optimization for kitty terminal users
+- **Enhanced audio format support**: Added support for .oga files in notification sounds
+- **Debug logging**: Enhanced logging for channel processing and guild operations
+
+### Fixed
+- **Missing channels in guild list**: Removed overly restrictive permission check that was hiding legitimate channels
+- **Channel display issues**: All channel types (text, voice, announcements, stores) now display properly
+- **Kitty terminal visual artifacts**: Fixed flickering and rendering issues in kitty terminal
+- **Audio playback errors**: Better error handling and fallback for unsupported audio formats
 
 ### Changed
 - Default navigation keybindings changed from vim-style (j/k/g/G) to arrow keys (↑↓/Home/End)
