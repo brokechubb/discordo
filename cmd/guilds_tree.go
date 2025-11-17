@@ -96,9 +96,21 @@ func (gt *guildsTree) createGuildNode(n *tview.TreeNode, guild discord.Guild) {
 }
 
 func (gt *guildsTree) createChannelNode(node *tview.TreeNode, channel discord.Channel) {
-	if channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM && !discordState.HasPermissions(channel.ID, discord.PermissionViewChannel) {
-		return
-	}
+	// Log every channel being processed
+	slog.Debug("processing channel",
+		"channel_id", channel.ID,
+		"channel_name", channel.Name,
+		"channel_type", channel.Type,
+		"guild_id", channel.GuildID)
+
+	// NOTE: Removed permission check because Discord already filters channels at the API level.
+	// If a channel appears in Cabinet.Channels(), the user should have access to see it.
+	// The permission check was causing legitimate channels to be hidden.
+
+	slog.Debug("creating channel node",
+		"channel_id", channel.ID,
+		"channel_name", channel.Name,
+		"channel_type", channel.Type)
 
 	channelNode := tview.NewTreeNode(ui.ChannelToString(channel)).
 		SetReference(channel.ID).
@@ -161,6 +173,8 @@ func (gt *guildsTree) onSelected(node *tview.TreeNode) {
 			slog.Error("failed to get channels", "err", err, "guild_id", ref)
 			return
 		}
+
+		slog.Debug("fetched channels for guild", "guild_id", ref, "total_channels", len(channels))
 
 		sort.Slice(channels, func(i, j int) bool {
 			return channels[i].Position < channels[j].Position

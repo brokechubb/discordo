@@ -10,6 +10,7 @@ import (
 	"github.com/ayn2op/discordo/internal/config"
 	"github.com/ayn2op/discordo/internal/keyring"
 	"github.com/ayn2op/discordo/internal/logger"
+	"github.com/ayn2op/discordo/internal/ui"
 	"github.com/ayn2op/tview"
 	"github.com/diamondburned/arikawa/v3/utils/ws"
 	"github.com/diamondburned/ningen/v3"
@@ -52,6 +53,9 @@ func Run() error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
+	// Apply terminal-specific optimizations before initializing the application
+	applyTerminalOptimizations()
+
 	token := *tokenFlag
 	if token == "" {
 		token, err = keyring.GetToken()
@@ -63,4 +67,23 @@ func Run() error {
 	tview.Styles = tview.Theme{}
 	app = newApplication(cfg)
 	return app.run(token)
+}
+
+// applyTerminalOptimizations applies terminal-specific optimizations to reduce visual artifacts
+func applyTerminalOptimizations() {
+	// Check if we're running in kitty terminal
+	if ui.IsKittyTerminal() {
+		// Set environment variables to help with kitty-specific rendering issues
+		if os.Getenv("TCELL_TRUECOLOR") == "" {
+			os.Setenv("TCELL_TRUECOLOR", "disable")
+		}
+
+		// Ensure proper color handling for kitty
+		if os.Getenv("COLORTERM") == "" {
+			os.Setenv("COLORTERM", "truecolor")
+		}
+
+		// Additional kitty-specific optimizations
+		os.Setenv("TERM", ui.GetKittyCompatibleTerm())
+	}
 }

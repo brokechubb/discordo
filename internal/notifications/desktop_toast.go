@@ -3,6 +3,7 @@
 package notifications
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,14 +72,15 @@ func playSoundFile(filePath string) error {
 			return err
 		}
 		decoder = mp3Decoder
-	case ".ogg":
+	case ".ogg", ".oga":
 		oggDecoder, _, _, err := vorbis.Decode(file)
 		if err != nil {
 			return err
 		}
 		decoder = oggDecoder
 	default:
-		return err
+		// For unsupported formats, close the file and return an error to trigger fallback
+		return fmt.Errorf("unsupported audio format: %s", ext)
 	}
 
 	player := ctx.NewPlayer(decoder)

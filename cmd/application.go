@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/ayn2op/discordo/internal/config"
@@ -35,6 +36,19 @@ type application struct {
 }
 
 func newApplication(cfg *config.Config) *application {
+	// Check if we're running in kitty terminal and apply optimizations
+	if ui.IsKittyTerminal() {
+		// Set environment variable to help with kitty-specific rendering issues
+		if os.Getenv("TCELL_TRUECOLOR") == "" {
+			os.Setenv("TCELL_TRUECOLOR", "disable")
+		}
+		// Some kitty-specific optimizations to reduce visual artifacts
+		if os.Getenv("KITTY_WINDOW_ID") != "" {
+			// Ensure proper color handling
+			os.Setenv("COLORTERM", "truecolor")
+		}
+	}
+
 	app := &application{
 		cfg: cfg,
 
