@@ -11,7 +11,7 @@ in
       type = settingsFormat.type;
       description = ''
         Configuration for discordo.
-        See https://github.com/ayn2op/discordo?tab=readme-ov-file#configuration 
+        See https://github.com/brokechubb/discordo?tab=readme-ov-file#configuration 
         for available options and default values.
       '';
       default = { };

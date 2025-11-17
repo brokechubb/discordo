@@ -144,8 +144,8 @@ See the [Contributing Guide](./CONTRIBUTING.md) for the full contribution proces
 
 ### Community
 - [Discord Server](https://discord.gg/EbFP3Uxx)
-- [GitHub Issues](https://github.com/ayn2op/discordo/issues)
-- [GitHub Discussions](https://github.com/ayn2op/discordo/discussions)
+- [GitHub Issues](https://github.com/brokechubb/discordo/issues)
+- [GitHub Discussions](https://github.com/brokechubb/discordo/discussions)
 
 ### Related Projects
 - [Discord API Documentation](https://discord.com/developers/docs/intro)
@@ -162,4 +162,4 @@ If you can't find the information you need:
 
 ---
 
-This documentation index is part of Discordo's comprehensive documentation system. For the most up-to-date information, check the [GitHub repository](https://github.com/ayn2op/discordo).
+This documentation index is part of Discordo's comprehensive documentation system. For the most up-to-date information, check the [GitHub repository](https://github.com/brokechubb/discordo).

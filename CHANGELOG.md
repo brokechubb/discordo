@@ -149,7 +149,7 @@ For questions about changes or upgrade issues:
 - Check the [Configuration Guide](./CONFIGURATION.md)
 - Review [Contributing Guidelines](./CONTRIBUTING.md)
 - Join our [Discord server](https://discord.gg/EbFP3Uxx)
-- Open an issue on [GitHub](https://github.com/ayn2op/discordo/issues)
+- Open an issue on [GitHub](https://github.com/brokechubb/discordo/issues)
 
 ---
 

@@ -408,7 +408,7 @@ cp ~/.config/discordo/config.toml ~/.config/discordo/config.toml.backup
 
 # Remove old directory and clone fresh
 rm -rf discordo
-git clone -b tip-cc-autoclaim https://github.com/ayn2op/discordo
+git clone https://github.com/brokechubb/discordo
 cd discordo
 go build .
 

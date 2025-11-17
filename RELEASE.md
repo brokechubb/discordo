@@ -38,11 +38,11 @@ The release workflow builds binaries for the following platforms:
 
 | Platform | Architecture | Binary Name |
 |----------|-------------|--------------|
-| Linux | AMD64 | `discordo-linux-amd64` |
-| Linux | ARM64 | `discordo-linux-arm64` |
+| Linux | AMD64 | `discordo-Linux-amd64` |
+| Linux | ARM64 | `discordo-Linux-arm64` |
 | Windows | AMD64 | `discordo-windows-amd64.exe` |
-| macOS | Intel (AMD64) | `discordo-macos-amd64` |
-| macOS | Apple Silicon (ARM64) | `discordo-macos-arm64` |
+| macOS | Intel (AMD64) | `discordo-macOS-amd64` |
+| macOS | Apple Silicon (ARM64) | `discordo-macOS-arm64` |
 
 ## Release Assets
 
@@ -64,7 +64,7 @@ Each release includes:
 
 ```bash
 # Download the appropriate binary
-wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-linux-amd64
+wget https://github.com/brokechubb/discordo/releases/latest/download/discordo-Linux-amd64
 
 # Make it executable
 chmod +x discordo-linux-amd64
@@ -77,7 +77,7 @@ chmod +x discordo-linux-amd64
 
 ```powershell
 # Download using PowerShell
-Invoke-WebRequest -Uri "https://github.com/ayn2op/discordo/releases/latest/download/discordo-windows-amd64.exe" -OutFile "discordo.exe"
+Invoke-WebRequest -Uri "https://github.com/brokechubb/discordo/releases/latest/download/discordo-windows-amd64.exe" -OutFile "discordo.exe"
 
 # Run it
 .\discordo.exe
@@ -87,12 +87,12 @@ Invoke-WebRequest -Uri "https://github.com/ayn2op/discordo/releases/latest/downl
 
 ```bash
 # Intel Macs
-wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-macos-amd64
+wget https://github.com/brokechubb/discordo/releases/latest/download/discordo-macOS-amd64
 chmod +x discordo-macos-amd64
 ./discordo-macos-amd64
 
 # Apple Silicon Macs
-wget https://github.com/ayn2op/discordo/releases/latest/download/discordo-macos-arm64
+wget https://github.com/brokechubb/discordo/releases/latest/download/discordo-macOS-arm64
 chmod +x discordo-macos-arm64
 ./discordo-macos-arm64
 ```
@@ -152,7 +152,7 @@ Use prereleases for testing and development:
    ```bash
    git add .
    git commit -m "Release v0.1.0"
-   git push origin tip-cc-autoclaim
+   git push origin main
    ```
 
 ### Creating Release

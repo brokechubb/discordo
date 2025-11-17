@@ -361,7 +361,7 @@ For pre-compiled binaries and installation instructions, see the [Release Guide]
 - ⚙️ [Configuration Guide](./CONFIGURATION.md) - Detailed configuration options
 - 🛠️ [Contributing Guide](./CONTRIBUTING.md) - Development and contribution guidelines
 - 💬 [Discord Server](https://discord.gg/EbFP3Uxx) - Community support
-- 🐛 [Issue Tracker](https://github.com/ayn2op/discordo/issues) - Bug reports and feature requests
+- 🐛 [Issue Tracker](https://github.com/brokechubb/discordo/issues) - Bug reports and feature requests
 
 > [!IMPORTANT]
 > Automated user accounts or "self-bots" are against Discord's Terms of Service. I am not responsible for any loss caused by using "self-bots" or Discordo.
