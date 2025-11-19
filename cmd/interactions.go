@@ -308,6 +308,29 @@ func (h *interactionHandler) isTipCCDropButton(buttonID string) bool {
 	return false
 }
 
+// isAirdropButton checks if the button ID is specifically for airdrops
+func (h *interactionHandler) isAirdropButton(buttonID string) bool {
+	// Primary tip.cc airdrop button patterns - most specific first
+	airdropPatterns := []string{
+		"claim_airdrop",
+		"grab_airdrop",
+		"collect_airdrop",
+		"receive_airdrop",
+	}
+
+	buttonIDLower := strings.ToLower(buttonID)
+
+	// Check for specific airdrop patterns
+	for _, pattern := range airdropPatterns {
+		if strings.Contains(buttonIDLower, pattern) {
+			slog.Debug("Airdrop button pattern detected", "pattern", pattern, "button_id", buttonID)
+			return true
+		}
+	}
+
+	return false
+}
+
 func (h *interactionHandler) isConfirmationDialogButton(buttonID, label string) bool {
 	buttonIDLower := strings.ToLower(buttonID)
 	labelLower := strings.ToLower(label)
@@ -845,6 +868,21 @@ func (h *interactionHandler) clickComponentButton(messageID discord.MessageID, c
 		"message_id", messageID,
 		"channel_id", channelID,
 	)
+
+	// Check if this was an airdrop button and show notification
+	if h.isAirdropButton(buttonID) {
+		channel, err := discordState.Cabinet.Channel(channelID)
+		channelName := "unknown"
+		if err == nil {
+			if channel.Name != "" {
+				channelName = channel.Name
+			} else {
+				channelName = channelID.String()
+			}
+		}
+		app.ShowNotification(fmt.Sprintf("Airdrop claimed in #%s", channelName))
+		slog.Info("Airdrop claimed notification shown", "channel", channelName, "button_id", buttonID)
+	}
 
 	return nil
 }
