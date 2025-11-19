@@ -24,7 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-references between documentation files
 - **Kitty terminal support**: Automatic detection and optimization for kitty terminal users
 - **Enhanced audio format support**: Added support for .oga files in notification sounds
+- **System Audio Command Support**: Added support for playing custom notification sounds in `noaudio` builds using system commands (paplay, aplay, powershell).
 - **Debug logging**: Enhanced logging for channel processing and guild operations
+- **Unit Tests**: Added tests for error string matching logic
 
 ### Fixed
 - **Missing channels in guild list**: Removed overly restrictive permission check that was hiding legitimate channels
@@ -32,24 +34,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Kitty terminal visual artifacts**: Fixed flickering and rendering issues in kitty terminal
 - **Audio playback errors**: Better error handling and fallback for unsupported audio formats
 - **Tip.cc Notification Spam**: Notifications now only trigger for valid airdrops (including `$airdrop`), properly display the channel name, and include a desktop toast + sound.
+- **DM conversation user coloring**: Users in DM conversations now display with proper colored usernames instead of uncolored text
+- **Color consistency**: Improved color application logic for better visibility across different terminal themes
+- **JSON Decoding Error Handling**: Added graceful handling for `UnknownComponent` errors during message fetching, preventing crashes and allowing access to channels with unsupported message components.
 
 ### Changed
 - Default navigation keybindings changed from vim-style (j/k/g/G) to arrow keys (↑↓/Home/End)
 - Updated documentation to reflect new default navigation controls
 - Clarified Tip.cc autoclaim scope (focused channel only) in documentation
 - Increased default `delay_ms` to 2100ms to prevent claiming redpackets too quickly.
-
-### Changed
 - Improved documentation structure and organization
 - Updated README with better installation instructions
+- **Documentation Updates**: Updated repository references to point to the correct fork (`brokechubb/discordo`) and improved README instructions.
 
 ### Deprecated
 
 ### Removed
-
-### Fixed
-- **DM conversation user coloring**: Users in DM conversations now display with proper colored usernames instead of uncolored text
-- **Color consistency**: Improved color application logic for better visibility across different terminal themes
 
 ### Security
 
