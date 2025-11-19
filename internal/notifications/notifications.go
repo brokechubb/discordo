@@ -15,6 +15,11 @@ import (
 	"github.com/diamondburned/ningen/v3"
 )
 
+// Send sends a desktop notification with a sound
+func Send(title string, content string, playSound bool, duration int) error {
+	return sendDesktopNotification(title, content, "", playSound, duration)
+}
+
 func Notify(state *ningen.State, message *gateway.MessageCreateEvent, cfg *config.Config) error {
 	if !cfg.Notifications.Enabled || cfg.Status == discord.DoNotDisturbStatus {
 		return nil

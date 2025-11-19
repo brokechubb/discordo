@@ -173,9 +173,27 @@ func onMessageCreate(message *gateway.MessageCreateEvent) {
 					if err := globalInteractionHandler.handleTipCCDropMessage(message.Message, message.ChannelID); err != nil {
 						slog.Error("failed to handle tip.cc drop", "err", err, "message_id", message.ID)
 					} else {
-						// Show persistent notification when tip.cc drop is detected
-						slog.Info("Tip.cc drop detected in focused channel (user account cannot auto-claim)", "message_id", message.ID, "channel_id", message.ChannelID)
-						app.ShowPersistentNotification(fmt.Sprintf("Tip.cc drop detected in #%s", message.ChannelID))
+						// Check if it is actually an airdrop before notifying
+						if globalInteractionHandler.IsTipCCAirdropMessage(message.Message) {
+							// Get channel name
+							channel, err := discordState.Cabinet.Channel(message.ChannelID)
+							channelName := message.ChannelID.String()
+							if err == nil && channel.Name != "" {
+								channelName = channel.Name
+							}
+
+							// Show persistent notification when tip.cc drop is detected
+							slog.Info("Tip.cc drop detected in focused channel (user account cannot auto-claim)", "message_id", message.ID, "channel_id", message.ChannelID)
+							msg := fmt.Sprintf("Tip.cc drop detected in #%s", channelName)
+							app.ShowPersistentNotification(msg)
+
+							// Also show desktop notification (toast) with sound
+							if app.cfg.Notifications.Enabled {
+								go func() {
+									_ = notifications.Send("Tip.cc Airdrop", msg, true, app.cfg.Notifications.Duration)
+								}()
+							}
+						}
 					}
 				}()
 			}

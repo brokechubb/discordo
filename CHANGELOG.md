@@ -31,11 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Channel display issues**: All channel types (text, voice, announcements, stores) now display properly
 - **Kitty terminal visual artifacts**: Fixed flickering and rendering issues in kitty terminal
 - **Audio playback errors**: Better error handling and fallback for unsupported audio formats
+- **Tip.cc Notification Spam**: Notifications now only trigger for valid airdrops (including `$airdrop`), properly display the channel name, and include a desktop toast + sound.
 
 ### Changed
 - Default navigation keybindings changed from vim-style (j/k/g/G) to arrow keys (↑↓/Home/End)
 - Updated documentation to reflect new default navigation controls
 - Clarified Tip.cc autoclaim scope (focused channel only) in documentation
+- Increased default `delay_ms` to 2100ms to prevent claiming redpackets too quickly.
 
 ### Changed
 - Improved documentation structure and organization

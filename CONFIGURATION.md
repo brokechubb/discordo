@@ -109,7 +109,7 @@ auto_claim = false
 # Enable debug logging
 debug = true
 # Delay between operations in milliseconds
-delay_ms = 100
+delay_ms = 2100
 ```
 
 **Important**: Tip.cc autoclaim only works when you have the specific channel focused where the drop occurs. This prevents accidental claims across multiple channels and gives you control over which drops to claim.
@@ -126,7 +126,7 @@ delay_ms = 100
 
 - **auto_claim**: Enable/disable automatic drop claiming (default: false) - confirmation dialogs always work
 - **debug**: Show detailed logging for tip.cc detection (default: true)
-- **delay_ms**: Delay before claiming to avoid race conditions (default: 100ms)
+- **delay_ms**: Delay before claiming to avoid race conditions (default: 2100ms)
 
 #### Automatic Confirmation Dialogs
 

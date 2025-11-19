@@ -14,6 +14,7 @@ import (
 
 	"github.com/ayn2op/discordo/internal/config"
 	http_internal "github.com/ayn2op/discordo/internal/http"
+	"github.com/ayn2op/discordo/internal/notifications"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/google/uuid"
 )
@@ -55,7 +56,7 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 	}
 
 	// Check for airdrop message pattern in content or embeds
-	isAirdropMessage := h.isTipCCAirdropMessage(message)
+	isAirdropMessage := h.IsTipCCAirdropMessage(message)
 
 	// Check if message has components
 	if len(message.Components) == 0 && !isAirdropMessage {
@@ -119,10 +120,11 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 	}
 }
 
-// isTipCCAirdropMessage checks if the message contains airdrop indicators
-func (h *interactionHandler) isTipCCAirdropMessage(message discord.Message) bool {
+// IsTipCCAirdropMessage checks if the message contains airdrop indicators
+func (h *interactionHandler) IsTipCCAirdropMessage(message discord.Message) bool {
 	// Primary airdrop patterns - most specific first
 	primaryPatterns := []string{
+		"$airdrop",
 		"✈ an airdrop appears",
 		"✈️ an airdrop appears",
 		"an airdrop appears",
@@ -880,7 +882,13 @@ func (h *interactionHandler) clickComponentButton(messageID discord.MessageID, c
 				channelName = channelID.String()
 			}
 		}
-		app.ShowNotification(fmt.Sprintf("Airdrop claimed in #%s", channelName))
+		msg := fmt.Sprintf("Airdrop claimed in #%s", channelName)
+		app.ShowNotification(msg)
+		if h.cfg.Notifications.Enabled {
+			go func() {
+				_ = notifications.Send("Airdrop Claimed", msg, true, h.cfg.Notifications.Duration)
+			}()
+		}
 		slog.Info("Airdrop claimed notification shown", "channel", channelName, "button_id", buttonID)
 	}
 

@@ -691,7 +691,7 @@ func (ml *messagesList) drawButtons(message discord.Message) {
 	}
 
 	// Check if this is an airdrop message
-	isAirdrop := globalInteractionHandler.isTipCCAirdropMessage(message)
+	isAirdrop := globalInteractionHandler.IsTipCCAirdropMessage(message)
 
 	// Check if message has components or is an airdrop message
 	if len(message.Components) == 0 && !isAirdrop {

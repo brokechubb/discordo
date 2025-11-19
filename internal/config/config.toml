@@ -38,7 +38,7 @@ file = ""
 [tipcc]
 auto_claim = false
 debug = true
-delay_ms = 1000
+delay_ms = 2100
 
 # Global shortcuts
 # Esc: Reset message selection or close the channel selection popup.

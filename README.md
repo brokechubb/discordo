@@ -192,7 +192,7 @@ Discordo includes automated Tip.cc airdrop detection and claiming with a persist
 [tipcc]
 auto_claim = true    # Enable autoclaim
 debug = true        # Show detection logs
-delay_ms = 100      # Delay before claiming
+delay_ms = 2100      # Delay before claiming
 ```
 
 **Status Indicator**:
@@ -244,7 +244,7 @@ dm_user_color = "green"  # Color for DM usernames
 [tipcc]
 auto_claim = true
 debug = true
-delay_ms = 100
+delay_ms = 2100
 ```
 
 ## FAQ
