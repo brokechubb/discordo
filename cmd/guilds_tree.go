@@ -234,13 +234,23 @@ func (gt *guildsTree) onSelected(node *tview.TreeNode) {
 				}
 
 				if fetchErr != nil {
-					slog.Error("failed to get messages for associated text channel", "err", fetchErr, "channel_id", textChannel.ID)
-					cabinetMessages, cabinetErr := discordState.Cabinet.Messages(textChannel.ID)
-					if cabinetErr != nil {
-						slog.Error("fallback cabinet message fetch also failed for associated text channel", "err", cabinetErr, "channel_id", textChannel.ID)
+					slog.Debug("primary message fetch failed for associated text channel, handling error", "channel_id", textChannel.ID, "err", fetchErr)
+					// Check if this is a JSON decoding error related to unknown components
+					errStr := fetchErr.Error()
+					if strings.Contains(errStr, "JSON decoding failed") && strings.Contains(errStr, "UnknownComponent") {
+						slog.Warn("skipping associated text channel due to JSON decoding issue with unknown components", "channel_id", textChannel.ID, "channel_name", textChannel.Name, "err", fetchErr)
+						// Still proceed with empty messages to show the channel without problematic messages
 						messages = []discord.Message{}
 					} else {
-						messages = cabinetMessages
+						slog.Error("failed to get messages for associated text channel", "err", fetchErr, "channel_id", textChannel.ID)
+						// Try to fetch messages from the cabinet as a fallback
+						cabinetMessages, cabinetErr := discordState.Cabinet.Messages(textChannel.ID)
+						if cabinetErr != nil {
+							slog.Error("fallback cabinet message fetch also failed for associated text channel", "err", cabinetErr, "channel_id", textChannel.ID)
+							messages = []discord.Message{}
+						} else {
+							messages = cabinetMessages
+						}
 					}
 				}
 
@@ -264,11 +274,59 @@ func (gt *guildsTree) onSelected(node *tview.TreeNode) {
 
 			go discordState.ReadState.MarkRead(channel.ID, channel.LastMessageID)
 
-			messages, err := discordState.Messages(channel.ID, uint(gt.cfg.MessagesLimit))
-			if err != nil {
-				slog.Error("failed to get messages", "err", err, "channel_id", channel.ID, "limit", gt.cfg.MessagesLimit)
-				return
+			slog.Debug("attempting to fetch messages", "channel_id", channel.ID, "channel_name", channel.Name, "limit", gt.cfg.MessagesLimit, "channel_type", channel.Type, "guild_id", channel.GuildID, "timestamp", time.Now().UnixNano())
+
+			// Initialize messages variable first
+			var messages []discord.Message
+			var fetchErr error
+
+			// Check permissions before attempting to fetch messages
+			if channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM {
+				hasViewPerm := discordState.HasPermissions(channel.ID, discord.PermissionViewChannel)
+				slog.Debug("permission check result", "channel_id", channel.ID, "channel_name", channel.Name, "has_view_permission", hasViewPerm, "timestamp", time.Now().UnixNano())
+				if !hasViewPerm {
+					slog.Warn("insufficient permissions to view channel", "channel_id", channel.ID, "channel_name", channel.Name, "timestamp", time.Now().UnixNano())
+					// Proceed with empty messages instead of failing completely
+					messages = []discord.Message{}
+					fetchErr = nil
+				} else {
+					slog.Debug("proceeding with message fetch - has permissions", "channel_id", channel.ID, "timestamp", time.Now().UnixNano())
+					messages, fetchErr = discordState.Messages(channel.ID, uint(gt.cfg.MessagesLimit))
+					slog.Debug("message fetch completed", "channel_id", channel.ID, "err", fetchErr, "message_count", len(messages), "timestamp", time.Now().UnixNano())
+				}
+			} else {
+				// For DMs and GroupDMs, skip permission checks
+				slog.Debug("proceeding with message fetch for DM/GroupDM - skipping permissions check", "channel_id", channel.ID, "timestamp", time.Now().UnixNano())
+				messages, fetchErr = discordState.Messages(channel.ID, uint(gt.cfg.MessagesLimit))
+				slog.Debug("message fetch completed for DM/GroupDM", "channel_id", channel.ID, "err", fetchErr, "message_count", len(messages), "timestamp", time.Now().UnixNano())
 			}
+
+			if fetchErr != nil {
+				slog.Debug("primary message fetch failed, handling error", "channel_id", channel.ID, "err", fetchErr, "timestamp", time.Now().UnixNano())
+				// Check if this is a JSON decoding error related to unknown components
+				errStr := fetchErr.Error()
+				if strings.Contains(errStr, "JSON decoding failed") && strings.Contains(errStr, "UnknownComponent") {
+					slog.Warn("skipping channel due to JSON decoding issue with unknown components", "channel_id", channel.ID, "channel_name", channel.Name, "err", fetchErr, "timestamp", time.Now().UnixNano())
+					// Still proceed with empty messages to show the channel without problematic messages
+					messages = []discord.Message{}
+				} else {
+					slog.Error("failed to get messages", "err", fetchErr, "channel_id", channel.ID, "limit", gt.cfg.MessagesLimit, "timestamp", time.Now().UnixNano())
+					// Try to fetch messages from the cabinet as a fallback
+					slog.Debug("attempting fallback message fetch from cabinet", "channel_id", channel.ID, "timestamp", time.Now().UnixNano())
+					cabinetMessages, cabinetErr := discordState.Cabinet.Messages(channel.ID)
+					if cabinetErr != nil {
+						slog.Error("fallback cabinet message fetch also failed", "err", cabinetErr, "channel_id", channel.ID, "timestamp", time.Now().UnixNano())
+						return
+					}
+					slog.Debug("successfully fetched messages from cabinet fallback", "channel_id", channel.ID, "message_count", len(cabinetMessages), "timestamp", time.Now().UnixNano())
+					messages = cabinetMessages
+				}
+			} else {
+				slog.Debug("primary message fetch succeeded", "channel_id", channel.ID, "message_count", len(messages), "timestamp", time.Now().UnixNano())
+			}
+
+			// Now set err to fetchErr for any remaining error handling
+			err = fetchErr
 
 			if guildID := channel.GuildID; guildID.IsValid() {
 				app.messagesList.requestGuildMembers(guildID, messages)
