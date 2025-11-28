@@ -156,25 +156,31 @@ func (ml *messagesList) drawAuthor(message discord.Message) {
 			colorName = ml.cfg.Theme.MessagesList.DMUserColor
 			slog.Debug("using DM user color", "author", name, "channel_type", channel.Type, "color", colorName)
 		} else if message.GuildID.IsValid() {
-			member, err := discordState.Cabinet.Member(message.GuildID, message.Author.ID)
-			if err != nil {
-				slog.Error("failed to get member from state", "guild_id", message.GuildID, "member_id", message.Author.ID, "err", err)
+			// Webhooks do not have nicknames or roles.
+			if message.WebhookID.IsValid() {
 				colorName = ml.cfg.Theme.MessagesList.DMUserColor
+				slog.Debug("webhook message, using DM user color", "author", name, "color", colorName)
 			} else {
-				if member.Nick != "" {
-					name = member.Nick
-				}
-
-				color, ok := state.MemberColor(member, func(id discord.RoleID) *discord.Role {
-					r, _ := discordState.Cabinet.Role(message.GuildID, id)
-					return r
-				})
-				if ok {
-					colorName = color.String()
-					slog.Debug("using role color", "author", name, "color", color.String())
-				} else {
+				member, err := discordState.Cabinet.Member(message.GuildID, message.Author.ID)
+				if err != nil {
+					slog.Error("failed to get member from state", "guild_id", message.GuildID, "member_id", message.Author.ID, "err", err)
 					colorName = ml.cfg.Theme.MessagesList.DMUserColor
-					slog.Debug("no role color, using DM user color", "author", name, "color", colorName)
+				} else {
+					if member.Nick != "" {
+						name = member.Nick
+					}
+
+					color, ok := state.MemberColor(member, func(id discord.RoleID) *discord.Role {
+						r, _ := discordState.Cabinet.Role(message.GuildID, id)
+						return r
+					})
+					if ok {
+						colorName = color.String()
+						slog.Debug("using role color", "author", name, "color", color.String())
+					} else {
+						colorName = ml.cfg.Theme.MessagesList.DMUserColor
+						slog.Debug("no role color, using DM user color", "author", name, "color", colorName)
+					}
 				}
 			}
 		} else {
@@ -788,6 +794,11 @@ func (ml *messagesList) delete() {
 func (ml *messagesList) requestGuildMembers(gID discord.GuildID, ms []discord.Message) {
 	var usersToFetch []discord.UserID
 	for _, m := range ms {
+		// Do not fetch member for a webhook message.
+		if m.WebhookID.IsValid() {
+			continue
+		}
+
 		if member, _ := discordState.Cabinet.Member(gID, m.Author.ID); member == nil {
 			usersToFetch = append(usersToFetch, m.Author.ID)
 		}
