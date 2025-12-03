@@ -5,6 +5,23 @@ All notable changes to Discordo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Webhook performance optimizations**: Improved message rendering performance in channels with webhook integrations
+- **Streamlined logging system**: Enhanced logging consistency with reduced dependencies
+
+### Fixed
+- **Webhook message performance**: Optimized message rendering by skipping unnecessary member fetches for webhook messages, improving performance in channels with bot integrations
+- **Webhook member fetching**: Resolved API inefficiencies by avoiding member requests for webhook-based messages in both author display and guild member requests
+
+### Changed
+- **Logger implementation**: Switched from tint to text handler for slog to improve logging consistency and reduce dependencies
+
+---
+
+## [0.1.0] - 2024-11-14
+
 ### Added
 - Arrow key navigation support for guilds tree and messages list
 - Persistent Tip.cc autoclaim status indicator in top bar

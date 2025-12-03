@@ -19,6 +19,26 @@ import (
 	"github.com/google/uuid"
 )
 
+// TriviaStrategy represents the answer selection strategy for triviadrops
+type TriviaStrategy string
+
+const (
+	TriviaStrategyRandom TriviaStrategy = "random"
+	TriviaStrategyFirst  TriviaStrategy = "first"
+	TriviaStrategyA      TriviaStrategy = "a"
+	TriviaStrategyB      TriviaStrategy = "b"
+	TriviaStrategyC      TriviaStrategy = "c"
+	TriviaStrategyD      TriviaStrategy = "d"
+	TriviaStrategySmart  TriviaStrategy = "smart"
+)
+
+// AnswerChoice represents a selected answer for triviadrops
+type AnswerChoice struct {
+	ButtonID string
+	Label    string
+	Index    int
+}
+
 type interactionHandler struct {
 	cfg *config.Config
 }
@@ -55,11 +75,12 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 		h.debugMessageStructure(message, channelID)
 	}
 
-	// Check for airdrop message pattern in content or embeds
+	// Check for airdrop and triviadrop message patterns
 	isAirdropMessage := h.IsTipCCAirdropMessage(message)
+	isTriviaDropMessage := h.IsTipCCTriviaDropMessage(message)
 
 	// Check if message has components
-	if len(message.Components) == 0 && !isAirdropMessage {
+	if len(message.Components) == 0 && !isAirdropMessage && !isTriviaDropMessage {
 		return
 	}
 
@@ -67,6 +88,13 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 	if isAirdropMessage && len(message.Components) == 0 {
 		slog.Info("Airdrop message detected, watching for buttons", "message_id", message.ID)
 		go h.watchForAirdropButtons(message.ID, channelID)
+		return
+	}
+
+	// If this is a triviadrop message without buttons yet, start watching
+	if isTriviaDropMessage && len(message.Components) == 0 {
+		slog.Info("🧩 Triviadrop message detected, watching for buttons", "message_id", message.ID)
+		go h.watchForTriviaDropButtons(message.ID, channelID)
 		return
 	}
 
@@ -85,6 +113,8 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 					buttonCategory := "confirmation"
 					if h.isTipCCDropButton(buttonID) {
 						buttonCategory = "drop"
+					} else if h.isTriviaDropAnswerButton(buttonID, label) {
+						buttonCategory = "triviadrop"
 					}
 
 					slog.Info("Detected tip.cc button",
@@ -93,7 +123,9 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 						"message_id", message.ID,
 						"category", buttonCategory,
 						"is_airdrop", isAirdropMessage,
+						"is_triviadrop", isTriviaDropMessage,
 						"auto_claim_enabled", h.cfg.TipCC.AutoClaim,
+						"triviadrop_enabled", h.cfg.TipCC.TriviaDrop,
 					)
 
 					// Auto-click logic - confirmation dialogs always work, drops only if auto_claim is enabled
@@ -104,6 +136,11 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 						if h.cfg.TipCC.AutoClaim {
 							shouldAutoClick = true
 							buttonType = "drop"
+						}
+					} else if h.isTriviaDropAnswerButton(buttonID, label) {
+						if h.cfg.TipCC.TriviaDrop && isTriviaDropMessage {
+							shouldAutoClick = true
+							buttonType = "triviadrop"
 						}
 					} else if h.isConfirmationDialogButton(buttonID, label) {
 						// Only auto-click actual confirmation buttons, not all buttons in a confirmation dialog
@@ -195,6 +232,119 @@ func (h *interactionHandler) IsTipCCAirdropMessage(message discord.Message) bool
 			if h.hasGameContext(message) {
 				slog.Debug("Secondary airdrop pattern with game context", "pattern", pattern, "content", message.Content)
 				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// IsTipCCTriviaDropMessage checks if the message contains triviadrop indicators
+func (h *interactionHandler) IsTipCCTriviaDropMessage(message discord.Message) bool {
+	// Primary triviadrop patterns - most specific first
+	primaryPatterns := []string{
+		"$triviadrop",
+		"trivia drop",
+		"triviadrop",
+		"trivia drop appears",
+		"a trivia drop",
+		"trivia drop created",
+		"trivia drop started",
+	}
+
+	// Secondary patterns - broader matching with game context
+	secondaryPatterns := []string{
+		"trivia drop",
+		"trivia",
+	}
+
+	// Check message content for primary patterns first
+	contentLower := strings.ToLower(message.Content)
+	for _, pattern := range primaryPatterns {
+		if strings.Contains(contentLower, pattern) {
+			slog.Debug("Primary triviadrop pattern detected", "pattern", pattern, "content", message.Content)
+			return true
+		}
+	}
+
+	// Check embeds for primary patterns
+	for _, embed := range message.Embeds {
+		if embed.Title != "" {
+			titleLower := strings.ToLower(embed.Title)
+			for _, pattern := range primaryPatterns {
+				if strings.Contains(titleLower, pattern) {
+					slog.Debug("Primary triviadrop pattern detected in embed title", "pattern", pattern, "title", embed.Title)
+					return true
+				}
+			}
+		}
+
+		if embed.Description != "" {
+			descLower := strings.ToLower(embed.Description)
+			for _, pattern := range primaryPatterns {
+				if strings.Contains(descLower, pattern) {
+					slog.Debug("Primary triviadrop pattern detected in embed description", "pattern", pattern, "description", embed.Description)
+					return true
+				}
+			}
+		}
+
+		// Check embed fields
+		for _, field := range embed.Fields {
+			fieldNameLower := strings.ToLower(field.Name)
+			fieldValueLower := strings.ToLower(field.Value)
+
+			for _, pattern := range primaryPatterns {
+				if strings.Contains(fieldNameLower, pattern) || strings.Contains(fieldValueLower, pattern) {
+					slog.Debug("Primary triviadrop pattern detected in embed field", "pattern", pattern, "field_name", field.Name, "field_value", field.Value)
+					return true
+				}
+			}
+		}
+	}
+
+	// Check secondary patterns only if they have game context
+	for _, pattern := range secondaryPatterns {
+		if strings.Contains(contentLower, pattern) {
+			if h.hasGameContext(message) {
+				slog.Debug("Secondary triviadrop pattern with game context", "pattern", pattern, "content", message.Content)
+				return true
+			}
+		}
+	}
+
+	// Check embeds for secondary patterns with game context
+	for _, embed := range message.Embeds {
+		if embed.Title != "" {
+			titleLower := strings.ToLower(embed.Title)
+			for _, pattern := range secondaryPatterns {
+				if strings.Contains(titleLower, pattern) && h.hasGameContext(message) {
+					slog.Debug("Secondary triviadrop pattern in embed title with game context", "pattern", pattern, "title", embed.Title)
+					return true
+				}
+			}
+		}
+
+		if embed.Description != "" {
+			descLower := strings.ToLower(embed.Description)
+			for _, pattern := range secondaryPatterns {
+				if strings.Contains(descLower, pattern) && h.hasGameContext(message) {
+					slog.Debug("Secondary triviadrop pattern in embed description with game context", "pattern", pattern, "description", embed.Description)
+					return true
+				}
+			}
+		}
+
+		// Check embed fields
+		for _, field := range embed.Fields {
+			fieldNameLower := strings.ToLower(field.Name)
+			fieldValueLower := strings.ToLower(field.Value)
+
+			for _, pattern := range secondaryPatterns {
+				if (strings.Contains(fieldNameLower, pattern) || strings.Contains(fieldValueLower, pattern)) && h.hasGameContext(message) {
+					slog.Debug("Secondary triviadrop pattern in embed field with game context", "pattern", pattern, "field_name", field.Name, "field_value", field.Value)
+					return true
+				}
 			}
 		}
 	}
@@ -333,6 +483,61 @@ func (h *interactionHandler) isAirdropButton(buttonID string) bool {
 	return false
 }
 
+// isTriviaDropAnswerButton checks if the button is specifically for triviadrop answers
+func (h *interactionHandler) isTriviaDropAnswerButton(buttonID, label string) bool {
+	buttonIDLower := strings.ToLower(buttonID)
+	labelLower := strings.ToLower(label)
+
+	// Primary triviadrop answer button patterns
+	answerPatterns := []string{
+		"answer_a", "answer_b", "answer_c", "answer_d",
+		"option_a", "option_b", "option_c", "option_d",
+		"trivia_a", "trivia_b", "trivia_c", "trivia_d",
+		"quiz_a", "quiz_b", "quiz_c", "quiz_d",
+		"true", "false",
+		"a)", "b)", "c)", "d)",
+		"(a)", "(b)", "(c)", "(d)",
+	}
+
+	// Check button ID patterns
+	for _, pattern := range answerPatterns {
+		if strings.Contains(buttonIDLower, pattern) {
+			slog.Debug("Triviadrop answer button pattern detected in ID", "pattern", pattern, "button_id", buttonID)
+			return true
+		}
+	}
+
+	// Check button label patterns
+	for _, pattern := range answerPatterns {
+		if strings.Contains(labelLower, pattern) {
+			slog.Debug("Triviadrop answer button pattern detected in label", "pattern", pattern, "button_label", label)
+			return true
+		}
+	}
+
+	// Check for single letter labels (A, B, C, D)
+	singleLetterPatterns := []string{"a", "b", "c", "d"}
+	if len(labelLower) > 0 {
+		for _, pattern := range singleLetterPatterns {
+			if strings.TrimSpace(labelLower) == pattern {
+				slog.Debug("Triviadrop single letter answer detected", "letter", pattern, "button_label", label)
+				return true
+			}
+		}
+	}
+
+	// Check for true/false specifically
+	trueFalsePatterns := []string{"true", "false"}
+	for _, pattern := range trueFalsePatterns {
+		if strings.TrimSpace(labelLower) == pattern {
+			slog.Debug("Triviadrop true/false answer detected", "answer", pattern, "button_label", label)
+			return true
+		}
+	}
+
+	return false
+}
+
 func (h *interactionHandler) isConfirmationDialogButton(buttonID, label string) bool {
 	buttonIDLower := strings.ToLower(buttonID)
 	labelLower := strings.ToLower(label)
@@ -462,17 +667,145 @@ func (h *interactionHandler) getClickableButtons(messageID discord.MessageID) []
 	return buttons
 }
 
-func (h *interactionHandler) autoClickButton(messageID discord.MessageID, channelID discord.ChannelID, buttonID, label string, isAirdrop bool, buttonType ...string) {
-	// Add delay if configured
-	if h.cfg.TipCC.Delay > 0 {
-		time.Sleep(time.Duration(h.cfg.TipCC.Delay) * time.Millisecond)
+// selectTriviaAnswer selects an answer based on the configured strategy
+func (h *interactionHandler) selectTriviaAnswer(message discord.Message) (AnswerChoice, error) {
+	var answerButtons []AnswerChoice
+
+	// Extract all answer buttons from the message
+	if len(message.Components) > 0 {
+		for componentIdx, component := range message.Components {
+			if actionRow, ok := component.(*discord.ActionRowComponent); ok {
+				for subComponentIdx, subComponent := range *actionRow {
+					if button, ok := subComponent.(*discord.ButtonComponent); ok {
+						buttonID := string(button.ID())
+						if h.isTriviaDropAnswerButton(buttonID, button.Label) {
+							answerButtons = append(answerButtons, AnswerChoice{
+								ButtonID: buttonID,
+								Label:    button.Label,
+								Index:    componentIdx*100 + subComponentIdx, // Unique index
+							})
+						}
+					}
+				}
+			}
+		}
 	}
 
+	if len(answerButtons) == 0 {
+		return AnswerChoice{}, fmt.Errorf("no answer buttons found")
+	}
+
+	// Parse strategy from config
+	strategy := TriviaStrategy(h.cfg.TipCC.TriviaStrategy)
+	if strategy == "" {
+		strategy = TriviaStrategyRandom
+	}
+
+	// Select answer based on strategy
+	switch strategy {
+	case TriviaStrategyFirst:
+		return answerButtons[0], nil
+	case TriviaStrategyA:
+		return h.findAnswerByLetter(answerButtons, "a")
+	case TriviaStrategyB:
+		return h.findAnswerByLetter(answerButtons, "b")
+	case TriviaStrategyC:
+		return h.findAnswerByLetter(answerButtons, "c")
+	case TriviaStrategyD:
+		return h.findAnswerByLetter(answerButtons, "d")
+	case TriviaStrategySmart:
+		// For now, fall back to random - can be enhanced later
+		return h.selectRandomAnswer(answerButtons), nil
+	case TriviaStrategyRandom:
+		fallthrough
+	default:
+		return h.selectRandomAnswer(answerButtons), nil
+	}
+}
+
+// selectRandomAnswer randomly selects an answer from available options
+func (h *interactionHandler) selectRandomAnswer(answers []AnswerChoice) AnswerChoice {
+	if len(answers) == 0 {
+		return AnswerChoice{}
+	}
+
+	// Simple random selection using time
+	randomIndex := time.Now().Nanosecond() % len(answers)
+	if randomIndex < 0 {
+		randomIndex = -randomIndex
+	}
+
+	selected := answers[randomIndex]
+	slog.Debug("Selected random answer",
+		"answer", selected.Label,
+		"button_id", selected.ButtonID,
+		"total_options", len(answers),
+		"selected_index", randomIndex)
+
+	return selected
+}
+
+// findAnswerByLetter finds an answer by its letter (A, B, C, D)
+func (h *interactionHandler) findAnswerByLetter(answers []AnswerChoice, letter string) (AnswerChoice, error) {
+	letter = strings.ToLower(letter)
+
+	for _, answer := range answers {
+		answerLabel := strings.ToLower(strings.TrimSpace(answer.Label))
+		if answerLabel == letter || answerLabel == letter+")" || answerLabel == "("+letter+")" {
+			slog.Debug("Selected answer by letter",
+				"letter", letter,
+				"answer", answer.Label,
+				"button_id", answer.ButtonID)
+			return answer, nil
+		}
+	}
+
+	// If exact match not found, try partial match
+	for _, answer := range answers {
+		answerLabel := strings.ToLower(answer.Label)
+		if strings.Contains(answerLabel, letter) {
+			slog.Debug("Selected answer by partial letter match",
+				"letter", letter,
+				"answer", answer.Label,
+				"button_id", answer.ButtonID)
+			return answer, nil
+		}
+	}
+
+	// Fallback to first answer if requested letter not found
+	if len(answers) > 0 {
+		slog.Debug("Requested letter not found, falling back to first answer",
+			"requested_letter", letter,
+			"fallback_answer", answers[0].Label)
+		return answers[0], nil
+	}
+
+	return AnswerChoice{}, fmt.Errorf("no answers available for letter %s", letter)
+}
+
+func (h *interactionHandler) autoClickButton(messageID discord.MessageID, channelID discord.ChannelID, buttonID, label string, isAirdrop bool, buttonType ...string) {
 	btnType := "button"
 	if isAirdrop {
 		btnType = "airdrop button"
 	} else if len(buttonType) > 0 {
 		btnType = buttonType[0]
+	}
+
+	// Add delay based on button type
+	if btnType == "triviadrop" {
+		// Use triviadrop-specific delay (much faster)
+		delay := h.cfg.TipCC.TriviaDelay
+		if delay == 0 {
+			delay = 200 // Default 200ms for triviadrops
+		}
+		if delay > 0 {
+			time.Sleep(time.Duration(delay) * time.Millisecond)
+		}
+	} else {
+		// Use regular delay for other button types
+		if h.cfg.TipCC.Delay > 0 {
+			time.Sleep(time.Duration(h.cfg.TipCC.Delay) * time.Millisecond)
+		}
 	}
 
 	if btnType == "confirmation" {
@@ -556,6 +889,36 @@ func (h *interactionHandler) watchForAirdropButtons(messageID discord.MessageID,
 
 		case <-timeout:
 			slog.Info("Airdrop button watch timeout", "message_id", messageID)
+			return
+		}
+	}
+}
+
+// watchForTriviaDropButtons monitors triviadrop messages for button updates
+func (h *interactionHandler) watchForTriviaDropButtons(messageID discord.MessageID, channelID discord.ChannelID) {
+	// Watch for updates to this message for a few seconds (triviadrops appear quickly)
+	ticker := time.NewTicker(200 * time.Millisecond) // Faster polling for triviadrops
+	defer ticker.Stop()
+
+	timeout := time.After(5 * time.Second) // Shorter timeout for triviadrops
+
+	for {
+		select {
+		case <-ticker.C:
+			// Check if message has been updated with buttons
+			message, err := discordState.Cabinet.Message(channelID, messageID)
+			if err != nil {
+				continue
+			}
+
+			if len(message.Components) > 0 {
+				slog.Info("🧩 Triviadrop buttons detected", "message_id", messageID)
+				h.detectButtonsInMessage(*message, channelID)
+				return
+			}
+
+		case <-timeout:
+			slog.Info("🧩 Triviadrop button watch timeout", "message_id", messageID)
 			return
 		}
 	}
@@ -748,7 +1111,7 @@ func (h *interactionHandler) handleTipCCDropMessage(message discord.Message, cha
 			return h.handlePhraseDrop(message, channelID, embed)
 		} else if strings.Contains(embedTitle, "math") {
 			return h.handleMathDrop(message, channelID, embed)
-		} else if strings.Contains(embedTitle, "trivia") {
+		} else if strings.Contains(embedTitle, "trivia") || h.IsTipCCTriviaDropMessage(message) {
 			return h.handleTriviaDrop(message, channelID, embed)
 		} else if strings.Contains(embedTitle, "appeared") && strings.Contains(embedDesc, "envelope") {
 			return h.handleRedpacket(message, channelID)
@@ -941,17 +1304,50 @@ func (h *interactionHandler) handleMathDrop(message discord.Message, channelID d
 
 // handleTriviaDrop handles tip.cc trivia drop messages
 func (h *interactionHandler) handleTriviaDrop(message discord.Message, channelID discord.ChannelID, embed discord.Embed) error {
-	slog.Info("Detected tip.cc trivia drop", "message_id", message.ID)
+	slog.Info("🧩 Detected tip.cc trivia drop", "message_id", message.ID)
 
-	// For trivia, we need to find the correct answer button
-	// For user accounts, we cannot automatically click trivia buttons
-	// Log the button information for awareness
+	// Check if triviadrop autoclaim is enabled
+	if !h.cfg.TipCC.TriviaDrop {
+		slog.Debug("Triviadrop autoclaim is disabled, logging buttons only")
+		return h.logTriviaButtons(message, channelID)
+	}
+
+	// Select answer based on strategy
+	selectedAnswer, err := h.selectTriviaAnswer(message)
+	if err != nil {
+		slog.Error("Failed to select trivia answer", "error", err, "message_id", message.ID)
+		return err
+	}
+
+	slog.Info("🧩 Selected triviadrop answer",
+		"answer", selectedAnswer.Label,
+		"button_id", selectedAnswer.ButtonID,
+		"strategy", h.cfg.TipCC.TriviaStrategy,
+		"message_id", message.ID)
+
+	// Apply triviadrop-specific delay (much faster than regular drops)
+	delay := h.cfg.TipCC.TriviaDelay
+	if delay == 0 {
+		delay = 200 // Default 200ms for triviadrops
+	}
+
+	// Auto-click the selected answer button with triviadrop delay
+	go func() {
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+		h.autoClickButton(message.ID, channelID, selectedAnswer.ButtonID, selectedAnswer.Label, false, "triviadrop")
+	}()
+
+	return nil
+}
+
+// logTriviaButtons logs available trivia buttons when autoclaim is disabled
+func (h *interactionHandler) logTriviaButtons(message discord.Message, channelID discord.ChannelID) error {
 	if len(message.Components) > 0 {
 		for _, component := range message.Components {
 			if actionRow, ok := component.(*discord.ActionRowComponent); ok {
 				for _, subComponent := range *actionRow {
 					if button, ok := subComponent.(*discord.ButtonComponent); ok {
-						slog.Info("Trivia button available",
+						slog.Info("Trivia button available (manual click required)",
 							"button_label", button.Label,
 							"button_id", button.ID(),
 							"channel_id", channelID,
@@ -961,7 +1357,6 @@ func (h *interactionHandler) handleTriviaDrop(message discord.Message, channelID
 			}
 		}
 	}
-
 	return nil
 }
 

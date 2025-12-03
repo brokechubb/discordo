@@ -561,3 +561,99 @@ func isAssociatedNamePattern(voiceName, textName string) bool {
 
 	return false
 }
+
+// ensureDMsLoaded ensures that DM channels are loaded into the tree
+func (gt *guildsTree) ensureDMsLoaded() {
+	// Find the "Direct Messages" node
+	var dmNode *tview.TreeNode
+	gt.GetRoot().Walk(func(node, parent *tview.TreeNode) bool {
+		if node.GetText() == "Direct Messages" && len(node.GetChildren()) == 0 {
+			dmNode = node
+			return false
+		}
+		return true
+	})
+
+	// If we found an empty DM node, load the DM channels
+	if dmNode != nil {
+		slog.Debug("loading DM channels into tree")
+		channels, err := discordState.PrivateChannels()
+		if err != nil {
+			slog.Error("failed to get private channels", "err", err)
+			return
+		}
+
+		sort.Slice(channels, func(a, b int) bool {
+			msgID := func(ch discord.Channel) discord.MessageID {
+				if ch.LastMessageID.IsValid() {
+					return ch.LastMessageID
+				}
+				return discord.MessageID(ch.ID)
+			}
+			return msgID(channels[a]) > msgID(channels[b])
+		})
+
+		for _, c := range channels {
+			gt.createChannelNode(dmNode, c)
+		}
+	}
+}
+
+// SelectChannel finds and selects a channel by ID in the guilds tree
+func (gt *guildsTree) SelectChannel(channelID discord.ChannelID, guildID discord.GuildID, isDM bool) {
+	var targetNode *tview.TreeNode
+	var parentNodes []*tview.TreeNode
+
+	slog.Debug("SelectChannel called", "channel_id", channelID, "guild_id", guildID, "is_dm", isDM)
+
+	// If this is a DM, ensure DM channels are loaded first
+	if isDM {
+		gt.ensureDMsLoaded()
+	}
+
+	// Walk the tree to find the channel node and collect parent path
+	gt.GetRoot().Walk(func(node, parent *tview.TreeNode) bool {
+		ref := node.GetReference()
+		switch v := ref.(type) {
+		case discord.ChannelID:
+			if v == channelID {
+				targetNode = node
+				slog.Debug("found target node", "channel_id", channelID)
+				// Collect all parent nodes in the path
+				p := parent
+				for p != nil && p.GetLevel() != 0 {
+					parentNodes = append(parentNodes, p)
+					// Find the parent of this node by walking again
+					var foundParent *tview.TreeNode
+					gt.GetRoot().Walk(func(n, gp *tview.TreeNode) bool {
+						if n == p {
+							foundParent = gp
+							return false
+						}
+						return true
+					})
+					p = foundParent
+				}
+				return false // Stop walking
+			}
+		}
+		return true // Continue walking
+	})
+
+	if targetNode != nil {
+		// Expand all parent nodes to ensure the target is visible
+		for _, parent := range parentNodes {
+			parent.SetExpanded(true)
+		}
+
+		// Select the target node
+		gt.SetCurrentNode(targetNode)
+
+		// Trigger the selection logic
+		gt.onSelected(targetNode)
+
+		slog.Debug("selected channel from notification", "channel_id", channelID, "guild_id", guildID, "is_dm", isDM)
+	} else {
+		slog.Warn("channel not found in guilds tree", "channel_id", channelID, "guild_id", guildID, "is_dm", isDM)
+	}
+}

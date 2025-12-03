@@ -696,11 +696,12 @@ func (ml *messagesList) drawButtons(message discord.Message) {
 		return
 	}
 
-	// Check if this is an airdrop message
+	// Check if this is an airdrop or triviadrop message
 	isAirdrop := globalInteractionHandler.IsTipCCAirdropMessage(message)
+	isTriviaDrop := globalInteractionHandler.IsTipCCTriviaDropMessage(message)
 
-	// Check if message has components or is an airdrop message
-	if len(message.Components) == 0 && !isAirdrop {
+	// Check if message has components or is a special drop message
+	if len(message.Components) == 0 && !isAirdrop && !isTriviaDrop {
 		return
 	}
 
@@ -708,6 +709,12 @@ func (ml *messagesList) drawButtons(message discord.Message) {
 	if isAirdrop {
 		fmt.Fprintln(ml)
 		fmt.Fprintf(ml, "[::d]✈️ [green]Airdrop detected![-] [-:-]")
+	}
+
+	// Show triviadrop indicator
+	if isTriviaDrop {
+		fmt.Fprintln(ml)
+		fmt.Fprintf(ml, "[::d]🧩 [cyan]Triviadrop![-] [-:-]")
 	}
 
 	// Iterate through action rows and display buttons

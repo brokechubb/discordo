@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/ayn2op/discordo/internal/config"
 	"github.com/ayn2op/discordo/internal/keyring"
 	"github.com/ayn2op/discordo/internal/logger"
 	"github.com/ayn2op/discordo/internal/ui"
 	"github.com/ayn2op/tview"
+	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/utils/ws"
 	"github.com/diamondburned/ningen/v3"
 )
@@ -20,6 +22,8 @@ var (
 	discordState             *ningen.State
 	app                      *application
 	globalInteractionHandler *interactionHandler
+	lastDMNotification       map[discord.UserID]time.Time // Track last DM notification per user
+	dmMessageCount           map[discord.UserID]int       // Track message count per user
 )
 
 func Run() error {
@@ -65,6 +69,11 @@ func Run() error {
 	}
 
 	tview.Styles = tview.Theme{}
+
+	// Initialize DM notification tracker
+	lastDMNotification = make(map[discord.UserID]time.Time)
+	dmMessageCount = make(map[discord.UserID]int)
+
 	app = newApplication(cfg)
 	return app.run(token)
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/ayn2op/discordo/internal/login"
 	"github.com/ayn2op/discordo/internal/ui"
 	"github.com/ayn2op/tview"
+	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -25,14 +26,23 @@ type application struct {
 	cfg *config.Config
 
 	*tview.Application
-	pages              *tview.Pages
-	flex               *tview.Flex
-	guildsTree         *guildsTree
-	messagesList       *messagesList
-	messageInput       *messageInput
-	notificationArea   *tview.TextView
-	hasPersistentNotif bool            // Track if there's a persistent notification
-	tipccStatusArea    *tview.TextView // Tip.cc autoclaim status indicator
+	pages               *tview.Pages
+	flex                *tview.Flex
+	guildsTree          *guildsTree
+	messagesList        *messagesList
+	messageInput        *messageInput
+	notificationArea    *tview.TextView
+	tipccStatusArea     *tview.TextView   // Tip.cc autoclaim status indicator
+	currentNotification *notificationInfo // Store current notification for click handling
+}
+
+// notificationInfo stores information about the current notification
+type notificationInfo struct {
+	message   string
+	channelID discord.ChannelID
+	guildID   discord.GuildID
+	isDM      bool
+	regionID  string // tview region ID for click handling
 }
 
 func newApplication(cfg *config.Config) *application {
@@ -64,6 +74,7 @@ func newApplication(cfg *config.Config) *application {
 	app.
 		EnableMouse(cfg.Mouse).
 		SetInputCapture(app.onInputCapture).
+		SetMouseCapture(app.onMouseCapture).
 		EnablePaste(true)
 	return app
 }
@@ -120,11 +131,7 @@ func (a *application) init() {
 	a.tipccStatusArea.SetTitle("Tip.cc")
 
 	// Initialize Tip.cc status display
-	if a.cfg.TipCC.AutoClaim {
-		fmt.Fprintf(a.tipccStatusArea, "[::b][green]Auto-claim ON[-]")
-	} else {
-		fmt.Fprintf(a.tipccStatusArea, "[::b][yellow]Auto-claim OFF[-]")
-	}
+	a.updateTipCCStatus()
 
 	right := tview.NewFlex().
 		SetDirection(tview.FlexRow).
@@ -167,12 +174,71 @@ func (a *application) onInputCapture(event *tcell.EventKey) *tcell.EventKey {
 			}()
 		}
 		return nil
+	case a.cfg.Keys.ToggleTriviaDrop:
+		// Add safety check to prevent freezing
+		if a.cfg.Keys.ToggleTriviaDrop != "" && a.tipccStatusArea != nil {
+			go func() {
+				a.toggleTriviaDrop()
+			}()
+		}
+		return nil
 	case "Ctrl+C":
 		// https://github.com/ayn2op/tview/blob/a64fc48d7654432f71922c8b908280cdb525805c/application.go#L153
 		return tcell.NewEventKey(tcell.KeyCtrlC, 0, tcell.ModNone)
 	}
 
 	return event
+}
+
+func (a *application) onMouseCapture(event *tcell.EventMouse, action tview.MouseAction) (*tcell.EventMouse, tview.MouseAction) {
+	// Check for left mouse click
+	if action == tview.MouseLeftClick {
+		// Get mouse position
+		x, y := event.Position()
+
+		// Check if we have a current notification
+		if a.notificationArea != nil && a.currentNotification != nil {
+			// Get notification area bounds
+			nx, ny, nw, nh := a.notificationArea.GetRect()
+
+			// Check if click is within notification area bounds
+			if x >= nx && x < nx+nw && y >= ny && y < ny+nh {
+				slog.Debug("notification clicked", "x", x, "y", y, "notification_bounds", fmt.Sprintf("%d,%d,%d,%d", nx, ny, nw, nh), "channel_id", a.currentNotification.channelID, "is_dm", a.currentNotification.isDM)
+
+				// Focus the channel/guild from the notification
+				a.focusNotificationChannel()
+				return event, action
+			} else {
+				slog.Debug("click outside notification area", "x", x, "y", y, "notification_bounds", fmt.Sprintf("%d,%d,%d,%d", nx, ny, nw, nh))
+			}
+		} else {
+			slog.Debug("no notification to click", "has_notification_area", a.notificationArea != nil, "has_current_notification", a.currentNotification != nil)
+		}
+	}
+
+	return event, action
+}
+
+// focusNotificationChannel focuses the channel/guild from the current notification
+func (a *application) focusNotificationChannel() {
+	if a.currentNotification == nil {
+		slog.Debug("no current notification to focus")
+		return
+	}
+
+	notif := a.currentNotification
+	slog.Debug("focusing notification channel", "channel_id", notif.channelID, "guild_id", notif.guildID, "is_dm", notif.isDM)
+
+	// Find and select the channel in the guilds tree
+	if a.guildsTree != nil {
+		slog.Debug("calling SelectChannel on guilds tree")
+		a.guildsTree.SelectChannel(notif.channelID, notif.guildID, notif.isDM)
+		// Focus the messages list after selection
+		a.SetFocus(a.messagesList)
+		slog.Debug("channel focus completed")
+	} else {
+		slog.Debug("guilds tree is nil")
+	}
 }
 
 func (a *application) onPagesInputCapture(event *tcell.EventKey) *tcell.EventKey {
@@ -296,19 +362,63 @@ func (a *application) ShowNotification(message string) {
 	if a.cfg.Notifications.Duration > 0 {
 		duration = time.Duration(a.cfg.Notifications.Duration) * time.Second
 	}
-	a.showNotification(message, duration, false)
+	a.showNotification(message, duration)
 }
 
-// ShowPersistentNotification displays a persistent notification that stays until cleared
-func (a *application) ShowPersistentNotification(message string) {
-	a.showNotification(message, 0, true)
+// ShowNotificationWithInfo displays a notification with channel/guild context for click-to-focus
+func (a *application) ShowNotificationWithInfo(message string, channelID discord.ChannelID, guildID discord.GuildID, isDM bool) {
+	duration := 30 * time.Second // Default duration
+	if a.cfg.Notifications.Duration > 0 {
+		duration = time.Duration(a.cfg.Notifications.Duration) * time.Second
+	}
+	a.showNotificationWithInfo(message, duration, channelID, guildID, isDM)
 }
 
-// showNotification handles both temporary and persistent notifications
-func (a *application) showNotification(message string, duration time.Duration, persistent bool) {
+// showNotification handles notifications
+func (a *application) showNotification(message string, duration time.Duration) {
 	if a.notificationArea != nil {
 		// Clear previous content and add new notification
 		a.notificationArea.Clear()
+
+		// Truncate message to fit on one line
+		maxMessageLen := 100 // More room without "Notification:" prefix
+		if len(message) > maxMessageLen {
+			message = message[:maxMessageLen] + "..."
+		}
+
+		fmt.Fprintf(a.notificationArea, "%s", message)
+
+		// Scroll to top to ensure first line is always visible
+		a.notificationArea.ScrollToBeginning()
+
+		// Auto-clear notifications after duration
+		if duration > 0 {
+			go func() {
+				time.Sleep(duration)
+				if a.notificationArea != nil {
+					// Use direct update instead of QueueUpdateDraw to avoid potential deadlocks
+					a.notificationArea.Clear()
+				}
+			}()
+		}
+	}
+}
+
+// showNotificationWithInfo handles notifications with channel/guild context for click-to-focus
+func (a *application) showNotificationWithInfo(message string, duration time.Duration, channelID discord.ChannelID, guildID discord.GuildID, isDM bool) {
+	if a.notificationArea != nil {
+		// Clear previous content and add new notification
+		a.notificationArea.Clear()
+
+		// Store notification info for click handling
+		regionID := fmt.Sprintf("notif_%d", time.Now().UnixNano())
+		a.currentNotification = &notificationInfo{
+			message:   message,
+			channelID: channelID,
+			guildID:   guildID,
+			isDM:      isDM,
+			regionID:  regionID,
+		}
 
 		// Truncate message to fit on one line (reserve space for "Notification: " prefix)
 		maxMessageLen := 80 // Adjust based on typical terminal width
@@ -316,24 +426,20 @@ func (a *application) showNotification(message string, duration time.Duration, p
 			message = message[:maxMessageLen] + "..."
 		}
 
-		fmt.Fprintf(a.notificationArea, "[::b]Notification:[-::-] %s", message)
+		// Add notification as a clickable region
+		a.notificationArea.Write([]byte(fmt.Sprintf("[%s]%s[-]", regionID, message)))
 
 		// Scroll to top to ensure first line is always visible
 		a.notificationArea.ScrollToBeginning()
 
-		// Track persistent notification state
-		a.hasPersistentNotif = persistent
-
-		// Auto-clear only for temporary notifications
-		if !persistent && duration > 0 {
+		// Auto-clear notifications after duration
+		if duration > 0 {
 			go func() {
 				time.Sleep(duration)
 				if a.notificationArea != nil {
 					// Use direct update instead of QueueUpdateDraw to avoid potential deadlocks
-					// Only clear if no persistent notification is active
-					if a.notificationArea.GetText(false) != "" && !a.hasPersistentNotif {
-						a.notificationArea.Clear()
-					}
+					a.notificationArea.Clear()
+					a.currentNotification = nil
 				}
 			}()
 		}
@@ -346,7 +452,7 @@ func (a *application) ClearNotification() {
 		// Use direct update instead of QueueUpdateDraw to avoid potential deadlocks
 		a.notificationArea.Clear()
 		a.notificationArea.ScrollToBeginning()
-		a.hasPersistentNotif = false
+		a.currentNotification = nil
 	}
 }
 
@@ -356,13 +462,33 @@ func (a *application) updateTipCCStatus() {
 		return
 	}
 
+	// Debug logging to troubleshoot triviadrop status
+	slog.Debug("Updating Tip.cc status",
+		"auto_claim", a.cfg.TipCC.AutoClaim,
+		"triviadrop_enabled", a.cfg.TipCC.TriviaDrop,
+		"triviadrop_strategy", a.cfg.TipCC.TriviaStrategy,
+		"triviadrop_delay", a.cfg.TipCC.TriviaDelay,
+	)
+
 	// Use a simple update instead of QueueUpdateDraw to avoid potential deadlocks
 	a.tipccStatusArea.Clear()
 
 	if a.cfg.TipCC.AutoClaim {
-		fmt.Fprintf(a.tipccStatusArea, "[::b][green]Auto-claim ON[-]")
+		status := "[::b][green]AUTOCLAIM[-]"
+		if a.cfg.TipCC.TriviaDrop {
+			status += " [::b][green]●[-] [cyan]🧩[-]"
+		} else {
+			status += " [::b][green]●[-]"
+		}
+		a.tipccStatusArea.Write([]byte(status))
 	} else {
-		fmt.Fprintf(a.tipccStatusArea, "[::b][yellow]Auto-claim OFF[-]")
+		var status string
+		if a.cfg.TipCC.TriviaDrop {
+			status = "[::b][red]AUTOCLAIM[-] [::b][red]●[-] [cyan]🧩[-]"
+		} else {
+			status = "[::b][red]AUTOCLAIM OFF[-]"
+		}
+		a.tipccStatusArea.Write([]byte(status))
 	}
 }
 
@@ -375,15 +501,17 @@ func (a *application) toggleTipCCAutoClaim() {
 	a.cfg.TipCC.AutoClaim = !a.cfg.TipCC.AutoClaim
 	a.updateTipCCStatus()
 
-	status := "disabled"
+	statusIndicator := "[red]●[-]"
+	statusText := "disabled"
 	if a.cfg.TipCC.AutoClaim {
-		status = "enabled"
+		statusIndicator = "[green]●[-]"
+		statusText = "enabled"
 	}
 
 	// Show notification without using complex UI updates that might cause deadlocks
 	if a.notificationArea != nil {
 		a.notificationArea.Clear()
-		notificationText := fmt.Sprintf("Tip.cc auto-claim %s (Ctrl+A to toggle)", status)
+		notificationText := fmt.Sprintf("Tip.cc auto-claim %s %s (Ctrl+A to toggle)", statusIndicator, statusText)
 
 		// Truncate to fit on one line
 		maxMessageLen := 80
@@ -395,5 +523,39 @@ func (a *application) toggleTipCCAutoClaim() {
 		a.notificationArea.ScrollToBeginning()
 	}
 
-	slog.Info("Tip.cc auto-claim toggled", "status", status)
+	slog.Info("Tip.cc auto-claim toggled", "status", statusText)
+}
+
+// toggleTriviaDrop toggles the Tip.cc triviadrop feature
+func (a *application) toggleTriviaDrop() {
+	if a == nil || a.cfg == nil {
+		return
+	}
+
+	a.cfg.TipCC.TriviaDrop = !a.cfg.TipCC.TriviaDrop
+	a.updateTipCCStatus()
+
+	statusIndicator := "[red]●[-]"
+	statusText := "disabled"
+	if a.cfg.TipCC.TriviaDrop {
+		statusIndicator = "[green]●[-]"
+		statusText = "enabled"
+	}
+
+	// Show notification without using complex UI updates that might cause deadlocks
+	if a.notificationArea != nil {
+		a.notificationArea.Clear()
+		notificationText := fmt.Sprintf("Tip.cc triviadrop %s %s (Ctrl+T to toggle)", statusIndicator, statusText)
+
+		// Truncate to fit on one line
+		maxMessageLen := 80
+		if len(notificationText) > maxMessageLen {
+			notificationText = notificationText[:maxMessageLen] + "..."
+		}
+
+		fmt.Fprintf(a.notificationArea, "[::b]Notification:[-::-] %s", notificationText)
+		a.notificationArea.ScrollToBeginning()
+	}
+
+	slog.Info("Tip.cc triviadrop toggled", "status", statusText)
 }

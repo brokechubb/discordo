@@ -33,9 +33,13 @@ type (
 	}
 
 	TipCC struct {
-		AutoClaim bool `toml:"auto_claim"`
-		Debug     bool `toml:"debug"`
-		Delay     int  `toml:"delay_ms"`
+		AutoClaim      bool   `toml:"auto_claim"`
+		Debug          bool   `toml:"debug"`
+		Delay          int    `toml:"delay_ms"`
+		TriviaDrop     bool   `toml:"triviadrop_enabled"`
+		TriviaStrategy string `toml:"triviadrop_strategy"`
+		TriviaDelay    int    `toml:"triviadrop_delay_ms"`
+		TriviaTimeout  int    `toml:"triviadrop_timeout_ms"`
 	}
 
 	Config struct {
@@ -111,6 +115,17 @@ func Load(path string) (*Config, error) {
 
 	if cfg.Status == "default" {
 		cfg.Status = ""
+	}
+
+	// Set default triviadrop values if not specified
+	if cfg.TipCC.TriviaStrategy == "" {
+		cfg.TipCC.TriviaStrategy = "random"
+	}
+	if cfg.TipCC.TriviaDelay == 0 {
+		cfg.TipCC.TriviaDelay = 200
+	}
+	if cfg.TipCC.TriviaTimeout == 0 {
+		cfg.TipCC.TriviaTimeout = 1000
 	}
 
 	return &cfg, nil

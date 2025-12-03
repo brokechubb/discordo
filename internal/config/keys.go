@@ -17,6 +17,7 @@ type (
 		ToggleGuildsTree     string `toml:"toggle_guilds_tree"`
 		ClearNotification    string `toml:"clear_notification"`
 		ToggleTipCCAutoClaim string `toml:"toggle_tipcc_autoclaim"`
+		ToggleTriviaDrop     string `toml:"toggle_triviadrop"`
 
 		GuildsTree   GuildsTreeKeys   `toml:"guilds_tree"`
 		MessagesList MessagesListKeys `toml:"messages_list"`

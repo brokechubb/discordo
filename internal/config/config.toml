@@ -39,6 +39,10 @@ file = ""
 auto_claim = false
 debug = true
 delay_ms = 2100
+triviadrop_enabled = true
+triviadrop_strategy = "random"
+triviadrop_delay_ms = 200
+triviadrop_timeout_ms = 1000
 
 # Global shortcuts
 # Esc: Reset message selection or close the channel selection popup.
@@ -54,6 +58,8 @@ toggle_guilds_tree = "Ctrl+B"
 clear_notification = "Ctrl+K"
 # Toggle Tip.cc autoclaim on/off
 toggle_tipcc_autoclaim = "Ctrl+A"
+# Toggle Tip.cc triviadrop on/off
+toggle_triviadrop = "Ctrl+T"
 quit = "Ctrl+C"
 # Log out and remove the authentication token from keyring.
 # Requires re-login upon restart.

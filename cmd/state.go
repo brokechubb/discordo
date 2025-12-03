@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/ayn2op/discordo/internal/http"
@@ -157,9 +158,12 @@ func onMessageCreate(message *gateway.MessageCreateEvent) {
 		app.Draw()
 	}
 
-	// Detect buttons in tip.cc messages and handle drops automatically if enabled
+	// Detect buttons in tip.cc messages and handle drops automatically if enabled (only in focused channel)
 	if globalInteractionHandler != nil {
-		globalInteractionHandler.detectButtonsInMessage(message.Message, message.ChannelID)
+		// Only detect and auto-click buttons in the focused channel to prevent claiming airdrops in all servers
+		if app.guildsTree.selectedChannelID == message.ChannelID {
+			globalInteractionHandler.detectButtonsInMessage(message.Message, message.ChannelID)
+		}
 
 		// Auto-handle tip.cc drops if enabled in config and in focused channel
 		const tipCCBotID = 617037497574359050
@@ -182,10 +186,10 @@ func onMessageCreate(message *gateway.MessageCreateEvent) {
 								channelName = channel.Name
 							}
 
-							// Show persistent notification when tip.cc drop is detected
+							// Show regular notification when tip.cc drop is detected
 							slog.Info("Tip.cc drop detected in focused channel (user account cannot auto-claim)", "message_id", message.ID, "channel_id", message.ChannelID)
-							msg := fmt.Sprintf("Tip.cc drop detected in #%s", channelName)
-							app.ShowPersistentNotification(msg)
+							msg := fmt.Sprintf("[Tip.cc] Drop in #%s", channelName)
+							app.ShowNotification(msg)
 
 							// Also show desktop notification (toast) with sound
 							if app.cfg.Notifications.Enabled {
@@ -207,9 +211,9 @@ func onMessageCreate(message *gateway.MessageCreateEvent) {
 		isDM := channel.Type == discord.DirectMessage || channel.Type == discord.GroupDM
 
 		if isDM {
-			app.ShowNotification(fmt.Sprintf("DM from %s: %s", message.Author.Username, truncateString(message.Content, 50)))
+			app.ShowNotificationWithInfo(formatDMNotification(message), message.ChannelID, 0, true)
 		} else if mentions > 0 {
-			app.ShowNotification(fmt.Sprintf("%s in #%s: %s", message.Author.Username, channel.Name, truncateString(message.Content, 50)))
+			app.ShowNotificationWithInfo(fmt.Sprintf("[#%s] [::b]%s[::-]: %s", channel.Name, message.Author.Username, truncateString(message.Content, 50)), message.ChannelID, channel.GuildID, false)
 		}
 	}
 
@@ -223,12 +227,15 @@ func onMessageUpdate(message *gateway.MessageUpdateEvent) {
 		onMessageDelete(&gateway.MessageDeleteEvent{ID: message.ID, ChannelID: message.ChannelID, GuildID: message.GuildID})
 	}
 
-	// Check for button updates in tip.cc messages
+	// Check for button updates in tip.cc messages (only in focused channel)
 	if globalInteractionHandler != nil {
-		// Get the full message from state
-		fullMessage, err := discordState.Cabinet.Message(message.ChannelID, message.ID)
-		if err == nil {
-			globalInteractionHandler.detectButtonsInMessage(*fullMessage, message.ChannelID)
+		// Only detect and auto-click buttons in the focused channel to prevent claiming airdrops in all servers
+		if app.guildsTree.selectedChannelID == message.ChannelID {
+			// Get the full message from state
+			fullMessage, err := discordState.Cabinet.Message(message.ChannelID, message.ID)
+			if err == nil {
+				globalInteractionHandler.detectButtonsInMessage(*fullMessage, message.ChannelID)
+			}
 		}
 	}
 }
@@ -239,6 +246,129 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// getMessageType returns the type of message content for notification formatting
+func getMessageType(message *gateway.MessageCreateEvent) string {
+	// Check for attachments first (images, files, etc.)
+	if len(message.Attachments) > 0 {
+		if len(message.Attachments) == 1 {
+			return "[Image]"
+		}
+		return fmt.Sprintf("[%d attachments]", len(message.Attachments))
+	}
+
+	// Check for embeds
+	if len(message.Embeds) > 0 {
+		return "[Embed]"
+	}
+
+	// Check for stickers
+	if len(message.Stickers) > 0 {
+		return "[Sticker]"
+	}
+
+	// Check for reactions (might indicate interesting content)
+	if len(message.Reactions) > 0 {
+		return "[Reaction]"
+	}
+
+	// Default to text content
+	return ""
+}
+
+// smartTruncate truncates string at word boundaries for better readability
+func smartTruncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+
+	// Try to find last space before maxLen to cut at word boundary
+	lastSpace := strings.LastIndex(s[:maxLen], " ")
+	if lastSpace > maxLen/2 { // Only cut at space if it's not too early
+		return s[:lastSpace] + "..."
+	}
+
+	// Fallback to character truncation if no good word boundary
+	return s[:maxLen] + "..."
+}
+
+// formatDMNotification creates an improved notification message for DMs
+func formatDMNotification(message *gateway.MessageCreateEvent) string {
+	username := message.Author.Username
+	content := strings.TrimSpace(message.Content)
+
+	// Check for recent DM from same user (within 2 minutes)
+	now := time.Now()
+	if lastTime, exists := lastDMNotification[message.Author.ID]; exists {
+		if now.Sub(lastTime) < 2*time.Minute {
+			// Increment message count for this user
+			dmMessageCount[message.Author.ID]++
+
+			count := dmMessageCount[message.Author.ID]
+
+			// Get message type indicator
+			msgType := getMessageType(message)
+
+			// Format based on content type and count
+			if msgType != "" && content == "" {
+				// Pure media message with count
+				return fmt.Sprintf("[DM] [::b]%s[::-] (%d): %s", username, count, msgType)
+			} else if msgType != "" {
+				// Mixed content with count
+				truncated := smartTruncate(content, 40)
+				return fmt.Sprintf("[DM] [::b]%s[::-] (%d): %s %s", username, count, msgType, truncated)
+			} else if content == "" {
+				// Empty content with count
+				return fmt.Sprintf("[DM] [::b]%s[::-] (%d): <empty>", username, count)
+			} else {
+				// Regular text with count indicator
+				if count <= 3 {
+					// Show actual content for low counts
+					truncated := smartTruncate(content, 50)
+					return fmt.Sprintf("[DM] [::b]%s[::-] (%d): %s", username, count, truncated)
+				} else {
+					// Show "N more messages" for higher counts
+					truncated := smartTruncate(content, 35)
+					return fmt.Sprintf("[DM] [::b]%s[::-]: %s [+%d msgs]", username, truncated, count-1)
+				}
+			}
+		}
+	}
+
+	// Reset count for new message series and update time
+	dmMessageCount[message.Author.ID] = 1
+	lastDMNotification[message.Author.ID] = now
+
+	// Get message type indicator
+	msgType := getMessageType(message)
+
+	// Handle different message types
+	if msgType != "" {
+		if content == "" {
+			// Pure media/file message
+			return fmt.Sprintf("[DM] [::b]%s[::-]: %s", username, msgType)
+		} else {
+			// Mixed content - show type indicator + truncated content
+			truncated := smartTruncate(content, 50) // More room for content now
+			return fmt.Sprintf("[DM] [::b]%s[::-]: %s %s", username, msgType, truncated)
+		}
+	}
+
+	// Pure text message
+	if content == "" {
+		return fmt.Sprintf("[DM] [::b]%s[::-]", username)
+	}
+
+	// Check for mentions in the content (important even in DMs)
+	if me, err := discordState.Cabinet.Me(); err == nil && strings.Contains(content, "@"+me.Username) {
+		truncated := smartTruncate(content, 50)
+		return fmt.Sprintf("[DM] [::b]@%s[::-]: %s", username, truncated)
+	}
+
+	// Regular text message
+	truncated := smartTruncate(content, 60) // More room for content with cleaner format
+	return fmt.Sprintf("[DM] [::b]%s[::-]: %s", username, truncated)
 }
 
 func onMessageDelete(message *gateway.MessageDeleteEvent) {
