@@ -8,15 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Webhook performance optimizations**: Improved message rendering performance in channels with webhook integrations
-- **Streamlined logging system**: Enhanced logging consistency with reduced dependencies
+- **GitHub Actions compilation fixes**: Resolved build failures in CI/CD workflows with proper Go version configuration
+- **Cross-platform release support**: Fixed release compilation across all platforms (Linux, Windows, macOS)
+- **Anti-freeze notification system**: Implemented robust notification click-to-focus with timeout protection
+- **Clean notification display**: Removed unwanted notification prefixes while preserving functionality
 
 ### Fixed
+- **GitHub Actions build failures**: Resolved Go version compatibility issues between forked tview dependencies and CI environment
+- **Release workflow compilation**: Fixed all platform builds to complete successfully
+- **Git push conflicts**: Resolved tag/branch naming conflicts causing push failures
 - **Webhook message performance**: Optimized message rendering by skipping unnecessary member fetches for webhook messages, improving performance in channels with bot integrations
 - **Webhook member fetching**: Resolved API inefficiencies by avoiding member requests for webhook-based messages in both author display and guild member requests
 
 ### Changed
 - **Logger implementation**: Switched from tint to text handler for slog to improve logging consistency and reduce dependencies
+- **CI/CD reliability**: Improved build process stability and error handling
 
 ---
 
