@@ -14,14 +14,35 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version: '1.23'
+          
+      - name: Verify Go installation
+        shell: bash
+        run: |
+          go version
+          go env GOOS GOARCH
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Runner arch: ${{ runner.arch }}"
+          
+      - name: Update Go modules
+        shell: bash
+        run: |
+          echo "Updating go modules..."
+          go mod tidy || echo "go mod tidy failed, continuing anyway"
+          go mod download || echo "go mod download failed, continuing anyway"
           
       - name: Install libx11-dev for clipboard support
         if: runner.os == 'Linux'
         run: sudo apt install libx11-dev
 
       - name: Build
-        run: go build -tags noaudio -ldflags "-s -w" .
+        shell: bash
+        run: |
+          set -e
+          echo "Building for ${{ runner.os }} ${{ runner.arch }}"
+          go build -tags noaudio -ldflags "-s -w" .
+          echo "Build completed successfully"
+          ls -la discordo*
 
       - uses: actions/upload-artifact@v4
         if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}

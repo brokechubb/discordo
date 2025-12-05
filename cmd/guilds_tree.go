@@ -604,7 +604,20 @@ func (gt *guildsTree) SelectChannel(channelID discord.ChannelID, guildID discord
 	var targetNode *tview.TreeNode
 	var parentNodes []*tview.TreeNode
 
-	slog.Debug("SelectChannel called", "channel_id", channelID, "guild_id", guildID, "is_dm", isDM)
+	slog.Debug("SelectChannel START", "channel_id", channelID, "guild_id", guildID, "is_dm", isDM, "current_selected", gt.selectedChannelID)
+
+	// Safety check: prevent recursive calls
+	if gt.selectedChannelID == channelID {
+		slog.Debug("channel already selected, skipping", "channel_id", channelID)
+		return
+	}
+
+	slog.Debug("STEP A: About to ensure DMs loaded if needed")
+	// If this is a DM, ensure DM channels are loaded first
+	if isDM {
+		gt.ensureDMsLoaded()
+		slog.Debug("STEP B: DMs loading completed")
+	}
 
 	// If this is a DM, ensure DM channels are loaded first
 	if isDM {
@@ -612,16 +625,37 @@ func (gt *guildsTree) SelectChannel(channelID discord.ChannelID, guildID discord
 	}
 
 	// Walk the tree to find the channel node and collect parent path
+	// Add safety check to prevent infinite loops
+	maxIterations := 1000
+	iterations := 0
+
+	slog.Debug("STEP C: Starting tree walking")
 	gt.GetRoot().Walk(func(node, parent *tview.TreeNode) bool {
+		iterations++
+		if iterations > maxIterations {
+			slog.Error("tree walking exceeded maximum iterations, stopping to prevent infinite loop", "iterations", iterations)
+			return false
+		}
+
+		if iterations%100 == 0 {
+			slog.Debug("tree walking progress", "iterations", iterations)
+		}
+
 		ref := node.GetReference()
 		switch v := ref.(type) {
 		case discord.ChannelID:
 			if v == channelID {
 				targetNode = node
-				slog.Debug("found target node", "channel_id", channelID)
+				slog.Debug("STEP D: found target node", "channel_id", channelID, "iterations", iterations)
 				// Collect all parent nodes in the path
 				p := parent
+				parentLoopCount := 0
 				for p != nil && p.GetLevel() != 0 {
+					parentLoopCount++
+					if parentLoopCount > 50 { // Safety check for parent loop
+						slog.Error("parent node collection exceeded safety limit")
+						break
+					}
 					parentNodes = append(parentNodes, p)
 					// Find the parent of this node by walking again
 					var foundParent *tview.TreeNode
@@ -634,23 +668,32 @@ func (gt *guildsTree) SelectChannel(channelID discord.ChannelID, guildID discord
 					})
 					p = foundParent
 				}
+				slog.Debug("STEP E: collected parent nodes", "parent_count", len(parentNodes))
 				return false // Stop walking
 			}
 		}
 		return true // Continue walking
 	})
+	slog.Debug("STEP F: tree walking completed", "target_found", targetNode != nil, "total_iterations", iterations)
 
 	if targetNode != nil {
+		slog.Debug("STEP G: target node found, expanding parents", "parent_count", len(parentNodes))
 		// Expand all parent nodes to ensure the target is visible
-		for _, parent := range parentNodes {
+		for i, parent := range parentNodes {
+			if i%10 == 0 {
+				slog.Debug("expanding parents progress", "i", i, "total", len(parentNodes))
+			}
 			parent.SetExpanded(true)
 		}
 
+		slog.Debug("STEP H: setting current node")
 		// Select the target node
 		gt.SetCurrentNode(targetNode)
 
+		slog.Debug("STEP I: about to call onSelected - THIS IS WHERE FREEZE MIGHT HAPPEN")
 		// Trigger the selection logic
 		gt.onSelected(targetNode)
+		slog.Debug("STEP J: onSelected completed successfully")
 
 		slog.Debug("selected channel from notification", "channel_id", channelID, "guild_id", guildID, "is_dm", isDM)
 	} else {

@@ -13,7 +13,7 @@ on:
       prerelease:
         description: 'Is this a prerelease?'
         required: true
-        default: 'false'
+        default: false
         type: boolean
 
 jobs:
@@ -55,10 +55,25 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version: '1.23'
+
+      - name: Verify Go installation
+        shell: bash
+        run: |
+          go version
+          go env GOOS GOARCH
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Matrix arch: ${{ matrix.arch }}"
+
+      - name: Update Go modules
+        shell: bash
+        run: |
+          echo "Updating go modules..."
+          go mod tidy || echo "go mod tidy failed, continuing anyway"
+          go mod download || echo "go mod download failed, continuing anyway"
 
       - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.arch != 'arm64'
         run: |
           sudo apt-get update
           sudo apt-get install -y libx11-dev libasound2-dev pkg-config alsa-utils pulseaudio-utils
@@ -77,21 +92,34 @@ jobs:
       - name: Build for ${{ matrix.arch }}
         shell: bash
         run: |
+          set -e
+          echo "Building for ${{ runner.os }} ${{ matrix.arch }}"
+          
           if [ "${{ matrix.arch }}" = "arm64" ]; then
             if [ "${{ runner.os }}" = "Linux" ]; then
               # Cross-compilation for ARM64 - disable CGO and audio to avoid dependency issues
+              echo "Cross-compiling Linux ARM64 with CGO_ENABLED=0"
               GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -tags=noaudio -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             elif [ "${{ runner.os }}" = "macOS" ]; then
-              GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+              echo "Building macOS ARM64"
+              GOOS=darwin GOARCH=arm64 go build -tags=noaudio -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             fi
           else
-            # For Linux AMD64, use noaudio tag but with enhanced system command support
+            # For AMD64 builds
             if [ "${{ runner.os }}" = "Linux" ]; then
+              echo "Building Linux AMD64 with noaudio tag"
               go build -tags=noaudio -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
-            else
-              go build -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+            elif [ "${{ runner.os }}" = "Windows" ]; then
+              echo "Building Windows AMD64"
+              GOOS=windows GOARCH=amd64 go build -tags=noaudio -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
+            elif [ "${{ runner.os }}" = "macOS" ]; then
+              echo "Building macOS AMD64"
+              GOOS=darwin GOARCH=amd64 go build -tags=noaudio -ldflags "-s -w" -o ${{ env.ARTIFACT_NAME }}
             fi
           fi
+          
+          echo "Build completed successfully"
+          ls -la ${{ env.ARTIFACT_NAME }}
 
       - name: Strip binary (Unix)
         if: runner.os != 'Windows' && matrix.arch != 'arm64'

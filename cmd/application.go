@@ -34,6 +34,8 @@ type application struct {
 	notificationArea    *tview.TextView
 	tipccStatusArea     *tview.TextView   // Tip.cc autoclaim status indicator
 	currentNotification *notificationInfo // Store current notification for click handling
+	selectedChannelID   discord.ChannelID
+	selectedGuildID     discord.GuildID
 }
 
 // notificationInfo stores information about the current notification
@@ -227,18 +229,94 @@ func (a *application) focusNotificationChannel() {
 	}
 
 	notif := a.currentNotification
-	slog.Debug("focusing notification channel", "channel_id", notif.channelID, "guild_id", notif.guildID, "is_dm", notif.isDM)
+	slog.Debug("focusNotificationChannel", "channel_id", notif.channelID, "guild_id", notif.guildID, "is_dm", notif.isDM)
 
-	// Find and select the channel in the guilds tree
-	if a.guildsTree != nil {
-		slog.Debug("calling SelectChannel on guilds tree")
-		a.guildsTree.SelectChannel(notif.channelID, notif.guildID, notif.isDM)
-		// Focus the messages list after selection
-		a.SetFocus(a.messagesList)
-		slog.Debug("channel focus completed")
+	// SAFER APPROACH: Skip the problematic SelectChannel/onSelected path
+	// Instead, directly update the UI components if possible
+
+	if a.messagesList != nil && discordState != nil {
+		slog.Debug("attempting direct channel focus")
+
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("panic during direct channel focus", "panic", r)
+					a.showNotificationError("Channel focus failed")
+				}
+			}()
+
+			// Get channel information
+			channel, err := discordState.Cabinet.Channel(notif.channelID)
+			if err != nil {
+				slog.Error("failed to get channel", "err", err, "channel_id", notif.channelID)
+				a.showNotificationError("Channel not found")
+				return
+			}
+
+			// Get messages for the channel
+			var messages []discord.Message
+			if channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM {
+				hasViewPerm := discordState.HasPermissions(notif.channelID, discord.PermissionViewChannel)
+				if !hasViewPerm {
+					messages = []discord.Message{}
+				} else {
+					messages, err = discordState.Messages(notif.channelID, uint(a.cfg.MessagesLimit))
+					if err != nil {
+						slog.Error("failed to get messages", "err", err)
+						messages = []discord.Message{}
+					}
+				}
+			} else {
+				messages, err = discordState.Messages(notif.channelID, uint(a.cfg.MessagesLimit))
+				if err != nil {
+					slog.Error("failed to get DM messages", "err", err)
+					messages = []discord.Message{}
+				}
+			}
+
+			// Update UI in main thread
+			a.QueueUpdateDraw(func() {
+				// Update messages list
+				a.messagesList.reset()
+				a.messagesList.setTitle(*channel)
+				a.messagesList.drawMessages(messages)
+				a.messagesList.ScrollToEnd()
+
+				// Update message input
+				hasNoPerm := channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM &&
+					!discordState.HasPermissions(notif.channelID, discord.PermissionSendMessages)
+
+				a.messageInput.SetDisabled(hasNoPerm)
+				if hasNoPerm {
+					a.messageInput.SetPlaceholder("You do not have permission to send messages in this channel.")
+				} else {
+					a.messageInput.SetPlaceholder("Message...")
+				}
+
+				// Update selected channel tracking
+				a.selectedChannelID = notif.channelID
+				a.selectedGuildID = notif.guildID
+
+				// Focus the messages list
+				a.SetFocus(a.messagesList)
+
+				slog.Debug("direct channel focus completed successfully")
+			})
+		}()
 	} else {
-		slog.Debug("guilds tree is nil")
+		slog.Error("cannot focus channel: messagesList or discordState is nil")
+		a.showNotificationError("Cannot focus channel")
 	}
+}
+
+// showNotificationError displays an error message in the notification area
+func (a *application) showNotificationError(message string) {
+	a.QueueUpdateDraw(func() {
+		if a.notificationArea != nil {
+			a.notificationArea.Clear()
+			fmt.Fprintf(a.notificationArea, "[::b][red]🔗 %s[-]", message)
+		}
+	})
 }
 
 func (a *application) onPagesInputCapture(event *tcell.EventKey) *tcell.EventKey {
@@ -426,8 +504,9 @@ func (a *application) showNotificationWithInfo(message string, duration time.Dur
 			message = message[:maxMessageLen] + "..."
 		}
 
-		// Add notification as a clickable region
-		a.notificationArea.Write([]byte(fmt.Sprintf("[%s]%s[-]", regionID, message)))
+		// Display notification with a clickable indicator
+		// The entire notification area is clickable via mouse handler
+		fmt.Fprintf(a.notificationArea, "[::b][blue]🔗 Click to focus[-] %s", message)
 
 		// Scroll to top to ensure first line is always visible
 		a.notificationArea.ScrollToBeginning()
