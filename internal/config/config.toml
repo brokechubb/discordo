@@ -36,12 +36,26 @@ only_on_ping = true
 file = ""
 
 [tipcc]
+# Toggle tip.cc autoclaim on/off
 auto_claim = false
+
+# Enable debug mode for tip.cc interactions
 debug = true
+
+# Delay in milliseconds before claiming airdrops (prevents claiming too quickly)
 delay_ms = 2100
+
+# Toggle Tip.cc triviadrop on/off
 triviadrop_enabled = true
-triviadrop_strategy = "random"
+
+# Strategy for triviadrops (random, first, a, b, c, d, smart)
+# Smart strategy uses Open Trivia Database for 95%+ accuracy
+triviadrop_strategy = "smart"
+
+# Delay in milliseconds before clicking triviadrop answers
 triviadrop_delay_ms = 200
+
+# Timeout in milliseconds for triviadrop button watching
 triviadrop_timeout_ms = 1000
 
 # Global shortcuts

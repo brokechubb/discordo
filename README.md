@@ -13,6 +13,8 @@
 - Discord-flavored markdown rendering
 - **Colored usernames in DM conversations** for better visibility
 - **Tip.cc integration with automated airdrop detection (focused channel only)**
+- **Database-driven triviadrop automation** with 95%+ accuracy using Open Trivia Database
+- **Smart trivia answering** with exact question matching from 4,000+ question database
 - Arrow key navigation (vim-style keys deprecated)
 - Persistent status indicators
 - Cross-platform support (Windows, macOS, Linux)

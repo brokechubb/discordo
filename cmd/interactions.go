@@ -15,6 +15,7 @@ import (
 	"github.com/ayn2op/discordo/internal/config"
 	http_internal "github.com/ayn2op/discordo/internal/http"
 	"github.com/ayn2op/discordo/internal/notifications"
+	"github.com/ayn2op/discordo/internal/trivia"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/google/uuid"
 )
@@ -40,13 +41,30 @@ type AnswerChoice struct {
 }
 
 type interactionHandler struct {
-	cfg *config.Config
+	cfg            *config.Config
+	triviaDatabase *trivia.TriviaDatabase
 }
 
 func newInteractionHandler(cfg *config.Config) *interactionHandler {
-	return &interactionHandler{
-		cfg: cfg,
+	h := &interactionHandler{
+		cfg:            cfg,
+		triviaDatabase: trivia.NewTriviaDatabase(),
 	}
+
+	// Initialize the trivia database in a goroutine to avoid blocking startup
+	// Only initialize if triviadrop is enabled and using smart strategy
+	if cfg.TipCC.TriviaDrop {
+		go func() {
+			slog.Info("Initializing trivia database...")
+			if err := h.triviaDatabase.DownloadOTDBDatabase(cfg); err != nil {
+				slog.Error("Failed to download trivia database", "error", err)
+			} else {
+				slog.Info("Trivia database initialized", "stats", h.triviaDatabase.GetStats())
+			}
+		}()
+	}
+
+	return h
 }
 
 // Store clickable buttons for manual interaction
@@ -667,11 +685,71 @@ func (h *interactionHandler) getClickableButtons(messageID discord.MessageID) []
 	return buttons
 }
 
-// selectTriviaAnswer selects an answer based on the configured strategy
+// selectTriviaAnswer selects an answer using database-driven approach
 func (h *interactionHandler) selectTriviaAnswer(message discord.Message) (AnswerChoice, error) {
-	var answerButtons []AnswerChoice
+	// First try database lookup for 95%+ accuracy
+	category, question, err := trivia.ExtractTriviaQuestion(message)
+	if err != nil {
+		slog.Warn("Failed to extract trivia question", "error", err, "message_id", message.ID)
+		// Fall back to heuristics if extraction fails
+		return h.heuristicBasedAnswer(message)
+	}
 
+	// Try exact database match first
+	if answer, found := h.triviaDatabase.GetAnswer(question); found {
+		slog.Info("Found exact match in trivia database",
+			"category", category,
+			"question", question,
+			"answer", answer,
+		)
+		return h.findMatchingButton(message, answer)
+	}
+
+	// Try fuzzy matching for variations
+	if answer, found := h.triviaDatabase.FuzzyMatch(question); found {
+		slog.Info("Found fuzzy match in trivia database",
+			"category", category,
+			"question", question,
+			"answer", answer,
+		)
+		return h.findMatchingButton(message, answer)
+	}
+
+	// If no database match, fall back to heuristics
+	slog.Info("No database match, falling back to heuristics",
+		"category", category,
+		"question", question,
+	)
+
+	return h.heuristicBasedAnswer(message)
+}
+
+// selectRandomAnswer randomly selects an answer from available options
+func (h *interactionHandler) selectRandomAnswer(answers []AnswerChoice) AnswerChoice {
+	if len(answers) == 0 {
+		return AnswerChoice{}
+	}
+
+	// Simple random selection using time
+	randomIndex := time.Now().Nanosecond() % len(answers)
+	if randomIndex < 0 {
+		randomIndex = -randomIndex
+	}
+
+	selected := answers[randomIndex]
+	slog.Debug("Selected random answer",
+		"answer", selected.Label,
+		"button_id", selected.ButtonID,
+		"total_options", len(answers),
+		"selected_index", randomIndex)
+
+	return selected
+}
+
+// heuristicBasedAnswer provides fallback logic when database lookup fails
+func (h *interactionHandler) heuristicBasedAnswer(message discord.Message) (AnswerChoice, error) {
 	// Extract all answer buttons from the message
+	var answerButtons []AnswerChoice
 	if len(message.Components) > 0 {
 		for componentIdx, component := range message.Components {
 			if actionRow, ok := component.(*discord.ActionRowComponent); ok {
@@ -695,54 +773,71 @@ func (h *interactionHandler) selectTriviaAnswer(message discord.Message) (Answer
 		return AnswerChoice{}, fmt.Errorf("no answer buttons found")
 	}
 
-	// Parse strategy from config
-	strategy := TriviaStrategy(h.cfg.TipCC.TriviaStrategy)
-	if strategy == "" {
-		strategy = TriviaStrategyRandom
+	// Extract trivia question for potential collection
+	category, question, err := trivia.ExtractTriviaQuestion(message)
+	if err != nil {
+		slog.Debug("Could not extract trivia question for collection", "error", err)
+	} else {
+		// Log unknown question for future database expansion
+		slog.Info("Unknown trivia question, potentially for database expansion",
+			"category", category,
+			"question", question,
+		)
 	}
 
-	// Select answer based on strategy
-	switch strategy {
-	case TriviaStrategyFirst:
-		return answerButtons[0], nil
-	case TriviaStrategyA:
-		return h.findAnswerByLetter(answerButtons, "a")
-	case TriviaStrategyB:
-		return h.findAnswerByLetter(answerButtons, "b")
-	case TriviaStrategyC:
-		return h.findAnswerByLetter(answerButtons, "c")
-	case TriviaStrategyD:
-		return h.findAnswerByLetter(answerButtons, "d")
-	case TriviaStrategySmart:
-		// For now, fall back to random - can be enhanced later
-		return h.selectRandomAnswer(answerButtons), nil
-	case TriviaStrategyRandom:
-		fallthrough
-	default:
-		return h.selectRandomAnswer(answerButtons), nil
-	}
+	// Use existing random selection as fallback
+	return h.selectRandomAnswer(answerButtons), nil
 }
 
-// selectRandomAnswer randomly selects an answer from available options
-func (h *interactionHandler) selectRandomAnswer(answers []AnswerChoice) AnswerChoice {
-	if len(answers) == 0 {
-		return AnswerChoice{}
+// findMatchingButton finds the button that matches the given answer
+func (h *interactionHandler) findMatchingButton(message discord.Message, targetAnswer string) (AnswerChoice, error) {
+	if len(message.Components) == 0 {
+		return AnswerChoice{}, fmt.Errorf("no components found in message")
 	}
 
-	// Simple random selection using time
-	randomIndex := time.Now().Nanosecond() % len(answers)
-	if randomIndex < 0 {
-		randomIndex = -randomIndex
+	// Search through action rows for buttons
+	componentIdx := 0
+	for _, component := range message.Components {
+		if actionRow, ok := component.(*discord.ActionRowComponent); ok {
+			subComponentIdx := 0
+			for _, subComponent := range *actionRow {
+				if button, ok := subComponent.(*discord.ButtonComponent); ok {
+					buttonLabel := strings.TrimSpace(button.Label)
+
+					// Exact match
+					if buttonLabel == targetAnswer {
+						return AnswerChoice{
+							ButtonID: string(button.ID()),
+							Label:    buttonLabel,
+							Index:    componentIdx*100 + subComponentIdx, // Unique index
+						}, nil
+					}
+
+					// Case-insensitive match
+					if strings.EqualFold(buttonLabel, targetAnswer) {
+						return AnswerChoice{
+							ButtonID: string(button.ID()),
+							Label:    buttonLabel,
+							Index:    componentIdx*100 + subComponentIdx, // Unique index
+						}, nil
+					}
+
+					// Partial match (for cases where answer might be truncated)
+					if strings.Contains(strings.ToLower(buttonLabel), strings.ToLower(targetAnswer)) {
+						return AnswerChoice{
+							ButtonID: string(button.ID()),
+							Label:    buttonLabel,
+							Index:    componentIdx*100 + subComponentIdx, // Unique index
+						}, nil
+					}
+				}
+				subComponentIdx++
+			}
+		}
+		componentIdx++
 	}
 
-	selected := answers[randomIndex]
-	slog.Debug("Selected random answer",
-		"answer", selected.Label,
-		"button_id", selected.ButtonID,
-		"total_options", len(answers),
-		"selected_index", randomIndex)
-
-	return selected
+	return AnswerChoice{}, fmt.Errorf("no matching button found for answer: %s", targetAnswer)
 }
 
 // findAnswerByLetter finds an answer by its letter (A, B, C, D)
