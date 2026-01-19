@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ayn2op/discordo/internal/config"
@@ -43,16 +44,19 @@ type AnswerChoice struct {
 type interactionHandler struct {
 	cfg            *config.Config
 	triviaDatabase *trivia.TriviaDatabase
+	dbReady        chan struct{} // Closed when database is ready
+	dbReadyOnce    sync.Once     // Ensures we only close the channel once
 }
 
 func newInteractionHandler(cfg *config.Config) *interactionHandler {
 	h := &interactionHandler{
 		cfg:            cfg,
 		triviaDatabase: trivia.NewTriviaDatabase(),
+		dbReady:        make(chan struct{}), // Initialize the ready channel
 	}
 
 	// Initialize the trivia database in a goroutine to avoid blocking startup
-	// Only initialize if triviadrop is enabled and using smart strategy
+	// Only initialize if triviadrop is enabled
 	if cfg.TipCC.TriviaDrop {
 		go func() {
 			slog.Info("Initializing trivia database...")
@@ -61,7 +65,16 @@ func newInteractionHandler(cfg *config.Config) *interactionHandler {
 			} else {
 				slog.Info("Trivia database initialized", "stats", h.triviaDatabase.GetStats())
 			}
+			// Mark the database as ready
+			h.dbReadyOnce.Do(func() {
+				close(h.dbReady)
+			})
 		}()
+	} else {
+		// If trivia drop is not enabled, mark as immediately ready
+		h.dbReadyOnce.Do(func() {
+			close(h.dbReady)
+		})
 	}
 
 	return h
@@ -685,12 +698,47 @@ func (h *interactionHandler) getClickableButtons(messageID discord.MessageID) []
 	return buttons
 }
 
-// selectTriviaAnswer selects an answer using database-driven approach
+// selectTriviaAnswer selects an answer based on the configured strategy
 func (h *interactionHandler) selectTriviaAnswer(message discord.Message) (AnswerChoice, error) {
+	// Get the configured strategy
+	strategy := TriviaStrategy(strings.ToLower(h.cfg.TipCC.TriviaStrategy))
+
+	slog.Debug("Selecting trivia answer",
+		"strategy", strategy,
+		"message_id", message.ID)
+
+	// Handle strategy-specific logic
+	switch strategy {
+	case TriviaStrategySmart:
+		// Use database lookup for 95%+ accuracy
+		return h.selectSmartAnswer(message)
+	case TriviaStrategyRandom:
+		return h.selectRandomAnswerStrategy(message)
+	case TriviaStrategyFirst:
+		return h.selectFirstAnswer(message)
+	case TriviaStrategyA, TriviaStrategyB, TriviaStrategyC, TriviaStrategyD:
+		return h.selectSpecificAnswer(message, strategy)
+	default:
+		// Default to smart strategy if unknown strategy
+		return h.selectSmartAnswer(message)
+	}
+}
+
+// selectSmartAnswer implements the database-driven answer selection
+func (h *interactionHandler) selectSmartAnswer(message discord.Message) (AnswerChoice, error) {
+	// Wait for the database to be ready (with timeout)
+	select {
+	case <-h.dbReady:
+		// Database is ready, continue
+	case <-time.After(10 * time.Second):
+		// Timeout waiting for database, proceed anyway but log warning
+		slog.Warn("Timeout waiting for trivia database to be ready", "message_id", message.ID)
+	}
+
 	// First try database lookup for 95%+ accuracy
 	category, question, err := trivia.ExtractTriviaQuestion(message)
 	if err != nil {
-		slog.Warn("Failed to extract trivia question", "error", err, "message_id", message.ID)
+		slog.Warn("Failed to extract trivia question for smart strategy", "error", err, "message_id", message.ID)
 		// Fall back to heuristics if extraction fails
 		return h.heuristicBasedAnswer(message)
 	}
@@ -722,6 +770,148 @@ func (h *interactionHandler) selectTriviaAnswer(message discord.Message) (Answer
 	)
 
 	return h.heuristicBasedAnswer(message)
+}
+
+// selectRandomAnswerStrategy implements random answer selection
+func (h *interactionHandler) selectRandomAnswerStrategy(message discord.Message) (AnswerChoice, error) {
+	var answerButtons []AnswerChoice
+	if len(message.Components) > 0 {
+		for componentIdx, component := range message.Components {
+			if actionRow, ok := component.(*discord.ActionRowComponent); ok {
+				for subComponentIdx, subComponent := range *actionRow {
+					if button, ok := subComponent.(*discord.ButtonComponent); ok {
+						buttonID := string(button.ID())
+						if h.isTriviaDropAnswerButton(buttonID, button.Label) {
+							answerButtons = append(answerButtons, AnswerChoice{
+								ButtonID: buttonID,
+								Label:    button.Label,
+								Index:    componentIdx*100 + subComponentIdx, // Unique index
+							})
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if len(answerButtons) == 0 {
+		slog.Warn("No answer buttons found for random strategy", "message_id", message.ID)
+		return AnswerChoice{}, fmt.Errorf("no answer buttons found")
+	}
+
+	// Simple random selection using time
+	randomIndex := time.Now().Nanosecond() % len(answerButtons)
+	if randomIndex < 0 {
+		randomIndex = -randomIndex
+	}
+
+	selected := answerButtons[randomIndex]
+	slog.Debug("Selected random answer",
+		"answer", selected.Label,
+		"button_id", selected.ButtonID,
+		"total_options", len(answerButtons),
+		"selected_index", randomIndex)
+
+	return selected, nil
+}
+
+// selectFirstAnswer implements first answer selection
+func (h *interactionHandler) selectFirstAnswer(message discord.Message) (AnswerChoice, error) {
+	if len(message.Components) > 0 {
+		for componentIdx, component := range message.Components {
+			if actionRow, ok := component.(*discord.ActionRowComponent); ok {
+				for subComponentIdx, subComponent := range *actionRow {
+					if button, ok := subComponent.(*discord.ButtonComponent); ok {
+						buttonID := string(button.ID())
+						if h.isTriviaDropAnswerButton(buttonID, button.Label) {
+							selected := AnswerChoice{
+								ButtonID: buttonID,
+								Label:    button.Label,
+								Index:    componentIdx*100 + subComponentIdx, // Unique index
+							}
+
+							slog.Debug("Selected first answer",
+								"answer", selected.Label,
+								"button_id", selected.ButtonID)
+
+							return selected, nil
+						}
+					}
+				}
+			}
+		}
+	}
+
+	slog.Warn("No answer buttons found for first strategy", "message_id", message.ID)
+	return AnswerChoice{}, fmt.Errorf("no answer buttons found")
+}
+
+// selectSpecificAnswer implements A, B, C, D specific answer selection
+func (h *interactionHandler) selectSpecificAnswer(message discord.Message, strategy TriviaStrategy) (AnswerChoice, error) {
+	// Convert strategy to target letter - extract the last character as string (a, b, c, d)
+	var targetLetter string
+	switch strategy {
+	case TriviaStrategyA:
+		targetLetter = "a"
+	case TriviaStrategyB:
+		targetLetter = "b"
+	case TriviaStrategyC:
+		targetLetter = "c"
+	case TriviaStrategyD:
+		targetLetter = "d"
+	default:
+		// For other strategies, just return first answer
+		return h.selectFirstAnswer(message)
+	}
+
+	var answerButtons []AnswerChoice
+	if len(message.Components) > 0 {
+		for componentIdx, component := range message.Components {
+			if actionRow, ok := component.(*discord.ActionRowComponent); ok {
+				for subComponentIdx, subComponent := range *actionRow {
+					if button, ok := subComponent.(*discord.ButtonComponent); ok {
+						buttonID := string(button.ID())
+						if h.isTriviaDropAnswerButton(buttonID, button.Label) {
+							answerButtons = append(answerButtons, AnswerChoice{
+								ButtonID: buttonID,
+								Label:    button.Label,
+								Index:    componentIdx*100 + subComponentIdx, // Unique index
+							})
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if len(answerButtons) == 0 {
+		slog.Warn("No answer buttons found for specific strategy", "strategy", strategy, "message_id", message.ID)
+		return AnswerChoice{}, fmt.Errorf("no answer buttons found")
+	}
+
+	// Find the button matching the specified letter
+	for _, answer := range answerButtons {
+		buttonLabel := strings.ToLower(strings.TrimSpace(answer.Label))
+		target := strings.ToLower(targetLetter)
+
+		if buttonLabel == target ||
+			buttonLabel == target+")" ||
+			buttonLabel == "("+target+")" {
+			slog.Debug("Selected specific answer",
+				"strategy", strategy,
+				"answer", answer.Label,
+				"button_id", answer.ButtonID)
+			return answer, nil
+		}
+	}
+
+	// If exact match not found, return the first answer
+	slog.Warn("Specific answer not found, returning first available",
+		"strategy", strategy,
+		"target_letter", targetLetter,
+		"available_options", len(answerButtons))
+
+	return answerButtons[0], nil
 }
 
 // selectRandomAnswer randomly selects an answer from available options
@@ -806,6 +996,9 @@ func (h *interactionHandler) findMatchingButton(message discord.Message, targetA
 
 					// Exact match
 					if buttonLabel == targetAnswer {
+						slog.Debug("Found exact match for answer",
+							"target_answer", targetAnswer,
+							"button_label", buttonLabel)
 						return AnswerChoice{
 							ButtonID: string(button.ID()),
 							Label:    buttonLabel,
@@ -815,6 +1008,27 @@ func (h *interactionHandler) findMatchingButton(message discord.Message, targetA
 
 					// Case-insensitive match
 					if strings.EqualFold(buttonLabel, targetAnswer) {
+						slog.Debug("Found case-insensitive match for answer",
+							"target_answer", targetAnswer,
+							"button_label", buttonLabel)
+						return AnswerChoice{
+							ButtonID: string(button.ID()),
+							Label:    buttonLabel,
+							Index:    componentIdx*100 + subComponentIdx, // Unique index
+						}, nil
+					}
+
+					// Normalize both strings for comparison
+					normalizedTarget := normalizeText(targetAnswer)
+					normalizedLabel := normalizeText(buttonLabel)
+
+					// Normalized match
+					if normalizedTarget == normalizedLabel {
+						slog.Debug("Found normalized match for answer",
+							"target_answer", targetAnswer,
+							"button_label", buttonLabel,
+							"normalized_target", normalizedTarget,
+							"normalized_label", normalizedLabel)
 						return AnswerChoice{
 							ButtonID: string(button.ID()),
 							Label:    buttonLabel,
@@ -824,6 +1038,27 @@ func (h *interactionHandler) findMatchingButton(message discord.Message, targetA
 
 					// Partial match (for cases where answer might be truncated)
 					if strings.Contains(strings.ToLower(buttonLabel), strings.ToLower(targetAnswer)) {
+						slog.Debug("Found partial match for answer",
+							"target_answer", targetAnswer,
+							"button_label", buttonLabel)
+						return AnswerChoice{
+							ButtonID: string(button.ID()),
+							Label:    buttonLabel,
+							Index:    componentIdx*100 + subComponentIdx, // Unique index
+						}, nil
+					}
+
+					// Check if the button label contains the target answer with common prefixes/suffixes
+					buttonLower := strings.ToLower(buttonLabel)
+					targetLower := strings.ToLower(targetAnswer)
+					if strings.Contains(buttonLower, " "+targetLower+" ") ||
+						strings.HasPrefix(buttonLower, targetLower+" ") ||
+						strings.HasSuffix(buttonLower, " "+targetLower) ||
+						buttonLower == targetLower+"!" ||
+						buttonLower == targetLower+"." {
+						slog.Debug("Found contextual match for answer",
+							"target_answer", targetAnswer,
+							"button_label", buttonLabel)
 						return AnswerChoice{
 							ButtonID: string(button.ID()),
 							Label:    buttonLabel,
@@ -837,7 +1072,29 @@ func (h *interactionHandler) findMatchingButton(message discord.Message, targetA
 		componentIdx++
 	}
 
+	slog.Warn("No matching button found for answer",
+		"target_answer", targetAnswer,
+		"message_id", message.ID)
 	return AnswerChoice{}, fmt.Errorf("no matching button found for answer: %s", targetAnswer)
+}
+
+// normalizeText normalizes text for comparison by removing extra spaces, punctuation, etc.
+func normalizeText(text string) string {
+	// Remove leading/trailing whitespace
+	text = strings.TrimSpace(text)
+
+	// Convert to lowercase
+	text = strings.ToLower(text)
+
+	// Remove common punctuation at the end
+	text = strings.TrimRight(text, ".!?:;")
+
+	// Normalize multiple spaces to single space
+	for strings.Contains(text, "  ") {
+		text = strings.ReplaceAll(text, "  ", " ")
+	}
+
+	return text
 }
 
 // findAnswerByLetter finds an answer by its letter (A, B, C, D)
