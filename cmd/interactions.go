@@ -129,9 +129,15 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 		return
 	}
 
-	// Debug: Log if we're not watching
+	// Info level logging for visibility
 	if !isTriviaDropMessage && len(message.Components) > 0 {
-		slog.Debug("Message has components but doesn't match triviadrop pattern", "message_id", message.ID)
+		slog.Info("Message has components but doesn't match triviadrop pattern", "message_id", message.ID)
+	}
+
+	// Check if triviadrop is enabled in config
+	if !h.cfg.TipCC.TriviaDrop {
+		slog.Warn("Trivia drop is disabled in config - enable it with triviadrop_enabled = true")
+		return
 	}
 
 	// Iterate through action rows and detect buttons
@@ -1473,7 +1479,6 @@ func (h *interactionHandler) sendTipCCClickCommand(messageID discord.MessageID, 
 }
 
 // handleTipCCDropMessage handles different types of tip.cc drops based on embed content
-// handleTipCCDropMessage handles different types of tip.cc drops based on embed content
 func (h *interactionHandler) handleTipCCDropMessage(message discord.Message, channelID discord.ChannelID) error {
 	// Check if this is a tip.cc drop message
 	const tipCCBotID = 617037497574359050
@@ -1481,24 +1486,52 @@ func (h *interactionHandler) handleTipCCDropMessage(message discord.Message, cha
 		return nil
 	}
 
+	// Info level logging for visibility
+	slog.Info("Processing tip.cc message",
+		"message_id", message.ID,
+		"channel_id", channelID,
+		"embeds_count", len(message.Embeds),
+		"components_count", len(message.Components),
+		"auto_claim", h.cfg.TipCC.AutoClaim,
+		"triviadrop_enabled", h.cfg.TipCC.TriviaDrop,
+	)
+
+	if !h.cfg.TipCC.TriviaDrop {
+		slog.Warn("Trivia drop autoplay is disabled in configuration.")
+	}
+
 	// Process different types of drops
-	for _, embed := range message.Embeds {
+	for i, embed := range message.Embeds {
 		embedTitle := strings.ToLower(embed.Title)
 		embedDesc := strings.ToLower(embed.Description)
 
+		slog.Info("Processing embed for drop types",
+			"embed_index", i,
+			"title", embed.Title,
+			"description_present", len(embed.Description) > 0,
+		)
+
 		// Handle different drop types
 		if strings.Contains(embedTitle, "airdrop") {
+			slog.Info("Detected airdrop", "embed_index", i)
 			return h.handleAirdrop(message, channelID)
 		} else if strings.Contains(embedTitle, "phrase") {
+			slog.Info("Detected phrase drop", "embed_index", i)
 			return h.handlePhraseDrop(message, channelID, embed)
 		} else if strings.Contains(embedTitle, "math") {
+			slog.Info("Detected math drop", "embed_index", i)
 			return h.handleMathDrop(message, channelID, embed)
 		} else if strings.Contains(embedTitle, "trivia") || h.IsTipCCTriviaDropMessage(message) {
+			slog.Info("🧩 Detected trivia/triviadrop", "embed_index", i, "title", embed.Title)
 			return h.handleTriviaDrop(message, channelID, embed)
 		} else if strings.Contains(embedTitle, "appeared") && strings.Contains(embedDesc, "envelope") {
+			slog.Info("Detected redpacket", "embed_index", i)
 			return h.handleRedpacket(message, channelID)
 		}
 	}
+
+	// Log if no drop types matched
+	slog.Info("No matching drop type found", "title", message.Embeds[0].Title, "description_length", len(message.Embeds[0].Description))
 
 	// Log any remaining buttons for manual attention
 	if len(message.Components) > 0 {
