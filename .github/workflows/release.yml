@@ -43,7 +43,7 @@ jobs:
             arch: amd64
             artifact_name: discordo
             asset_name: discordo-macos-amd64
-          - os: macos-13
+          - os: macos-15
             arch: arm64
             artifact_name: discordo
             asset_name: discordo-macos-arm64
