@@ -129,6 +129,11 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 		return
 	}
 
+	// Debug: Log if we're not watching
+	if !isTriviaDropMessage && len(message.Components) > 0 {
+		slog.Debug("Message has components but doesn't match triviadrop pattern", "message_id", message.ID)
+	}
+
 	// Iterate through action rows and detect buttons
 	for _, component := range message.Components {
 		if actionRow, ok := component.(*discord.ActionRowComponent); ok {
@@ -137,6 +142,10 @@ func (h *interactionHandler) detectButtonsInMessage(message discord.Message, cha
 				if button, ok := subComponent.(*discord.ButtonComponent); ok {
 					buttonID := string(button.ID())
 					label := button.Label
+
+					slog.Debug("Processing button component",
+						"button_label", label,
+						"is_triviadrop_button", h.isTriviaDropAnswerButton(buttonID, button.Label))
 
 					// Store clickable button info
 					h.storeClickableButton(message.ID, channelID, buttonID, label)
@@ -289,6 +298,12 @@ func (h *interactionHandler) IsTipCCTriviaDropMessage(message discord.Message) b
 		"trivia",
 	}
 
+	// Debug: Log initial check
+	slog.Debug("Checking for triviadrop message",
+		"author_id", message.Author.ID,
+		"content_length", len(message.Content),
+		"embeds_count", len(message.Embeds))
+
 	// Check message content for primary patterns first
 	contentLower := strings.ToLower(message.Content)
 	for _, pattern := range primaryPatterns {
@@ -299,7 +314,13 @@ func (h *interactionHandler) IsTipCCTriviaDropMessage(message discord.Message) b
 	}
 
 	// Check embeds for primary patterns
-	for _, embed := range message.Embeds {
+	for embedIdx, embed := range message.Embeds {
+		// Debug: Log embed details
+		slog.Debug("Checking embed for triviadrop",
+			"embed_index", embedIdx,
+			"title", embed.Title,
+			"description_length", len(embed.Description))
+
 		if embed.Title != "" {
 			titleLower := strings.ToLower(embed.Title)
 			for _, pattern := range primaryPatterns {
@@ -321,9 +342,16 @@ func (h *interactionHandler) IsTipCCTriviaDropMessage(message discord.Message) b
 		}
 
 		// Check embed fields
-		for _, field := range embed.Fields {
+		for fieldIdx, field := range embed.Fields {
 			fieldNameLower := strings.ToLower(field.Name)
 			fieldValueLower := strings.ToLower(field.Value)
+
+			// Debug: Log field being checked
+			slog.Debug("Checking embed field",
+				"embed_index", embedIdx,
+				"field_index", fieldIdx,
+				"field_name", field.Name,
+				"field_value_length", len(field.Value))
 
 			for _, pattern := range primaryPatterns {
 				if strings.Contains(fieldNameLower, pattern) || strings.Contains(fieldValueLower, pattern) {
@@ -345,12 +373,12 @@ func (h *interactionHandler) IsTipCCTriviaDropMessage(message discord.Message) b
 	}
 
 	// Check embeds for secondary patterns with game context
-	for _, embed := range message.Embeds {
+	for embedIdx, embed := range message.Embeds {
 		if embed.Title != "" {
 			titleLower := strings.ToLower(embed.Title)
 			for _, pattern := range secondaryPatterns {
 				if strings.Contains(titleLower, pattern) && h.hasGameContext(message) {
-					slog.Debug("Secondary triviadrop pattern in embed title with game context", "pattern", pattern, "title", embed.Title)
+					slog.Debug("Secondary triviadrop pattern in embed title with game context", "pattern", pattern, "embed_index", embedIdx, "title", embed.Title)
 					return true
 				}
 			}
@@ -360,26 +388,28 @@ func (h *interactionHandler) IsTipCCTriviaDropMessage(message discord.Message) b
 			descLower := strings.ToLower(embed.Description)
 			for _, pattern := range secondaryPatterns {
 				if strings.Contains(descLower, pattern) && h.hasGameContext(message) {
-					slog.Debug("Secondary triviadrop pattern in embed description with game context", "pattern", pattern, "description", embed.Description)
+					slog.Debug("Secondary triviadrop pattern in embed description with game context", "pattern", pattern, "embed_index", embedIdx, "description_length", len(embed.Description))
 					return true
 				}
 			}
 		}
 
 		// Check embed fields
-		for _, field := range embed.Fields {
+		for fieldIdx, field := range embed.Fields {
 			fieldNameLower := strings.ToLower(field.Name)
 			fieldValueLower := strings.ToLower(field.Value)
 
 			for _, pattern := range secondaryPatterns {
 				if (strings.Contains(fieldNameLower, pattern) || strings.Contains(fieldValueLower, pattern)) && h.hasGameContext(message) {
-					slog.Debug("Secondary triviadrop pattern in embed field with game context", "pattern", pattern, "field_name", field.Name, "field_value", field.Value)
+					slog.Debug("Secondary triviadrop pattern in embed field with game context", "pattern", pattern, "embed_index", embedIdx, "field_index", fieldIdx)
 					return true
 				}
 			}
 		}
 	}
 
+	// Debug: If we reached here, no patterns were found
+	slog.Debug("No triviadrop patterns found in message", "message_id", message.ID)
 	return false
 }
 
