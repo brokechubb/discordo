@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/ayn2op/discordo/internal/config"
@@ -26,40 +25,20 @@ type application struct {
 	cfg *config.Config
 
 	*tview.Application
-	pages               *tview.Pages
-	flex                *tview.Flex
-	guildsTree          *guildsTree
-	messagesList        *messagesList
-	messageInput        *messageInput
-	notificationArea    *tview.TextView
-	tipccStatusArea     *tview.TextView   // Tip.cc autoclaim status indicator
-	currentNotification *notificationInfo // Store current notification for click handling
-	selectedChannelID   discord.ChannelID
-	selectedGuildID     discord.GuildID
-}
-
-// notificationInfo stores information about the current notification
-type notificationInfo struct {
-	message   string
-	channelID discord.ChannelID
-	guildID   discord.GuildID
-	isDM      bool
-	regionID  string // tview region ID for click handling
+	pages             *tview.Pages
+	flex              *tview.Flex
+	guildsTree        *guildsTree
+	messagesList      *messagesList
+	messageInput      *messageInput
+	notificationArea  *tview.TextView
+	tipccStatusArea   *tview.TextView // Tip.cc autoclaim status indicator
+	selectedChannelID discord.ChannelID
+	selectedGuildID   discord.GuildID
 }
 
 func newApplication(cfg *config.Config) *application {
-	// Check if we're running in kitty terminal and apply optimizations
-	if ui.IsKittyTerminal() {
-		// Set environment variable to help with kitty-specific rendering issues
-		if os.Getenv("TCELL_TRUECOLOR") == "" {
-			os.Setenv("TCELL_TRUECOLOR", "disable")
-		}
-		// Some kitty-specific optimizations to reduce visual artifacts
-		if os.Getenv("KITTY_WINDOW_ID") != "" {
-			// Ensure proper color handling
-			os.Setenv("COLORTERM", "truecolor")
-		}
-	}
+	// Terminal optimizations are now handled in root.go via ui.ApplyKittyOptimizations()
+	// before the application is created
 
 	app := &application{
 		cfg: cfg,
@@ -76,7 +55,6 @@ func newApplication(cfg *config.Config) *application {
 	app.
 		EnableMouse(cfg.Mouse).
 		SetInputCapture(app.onInputCapture).
-		SetMouseCapture(app.onMouseCapture).
 		EnablePaste(true)
 	return app
 }
@@ -117,7 +95,6 @@ func (a *application) init() {
 	// Create notification area
 	a.notificationArea = tview.NewTextView().
 		SetDynamicColors(true).
-		SetRegions(true).
 		SetWrap(false).
 		SetWordWrap(false).
 		SetScrollable(false)
@@ -190,133 +167,6 @@ func (a *application) onInputCapture(event *tcell.EventKey) *tcell.EventKey {
 	}
 
 	return event
-}
-
-func (a *application) onMouseCapture(event *tcell.EventMouse, action tview.MouseAction) (*tcell.EventMouse, tview.MouseAction) {
-	// Check for left mouse click
-	if action == tview.MouseLeftClick {
-		// Get mouse position
-		x, y := event.Position()
-
-		// Check if we have a current notification
-		if a.notificationArea != nil && a.currentNotification != nil {
-			// Get notification area bounds
-			nx, ny, nw, nh := a.notificationArea.GetRect()
-
-			// Check if click is within notification area bounds
-			if x >= nx && x < nx+nw && y >= ny && y < ny+nh {
-				slog.Debug("notification clicked", "x", x, "y", y, "notification_bounds", fmt.Sprintf("%d,%d,%d,%d", nx, ny, nw, nh), "channel_id", a.currentNotification.channelID, "is_dm", a.currentNotification.isDM)
-
-				// Focus the channel/guild from the notification
-				a.focusNotificationChannel()
-				return event, action
-			} else {
-				slog.Debug("click outside notification area", "x", x, "y", y, "notification_bounds", fmt.Sprintf("%d,%d,%d,%d", nx, ny, nw, nh))
-			}
-		} else {
-			slog.Debug("no notification to click", "has_notification_area", a.notificationArea != nil, "has_current_notification", a.currentNotification != nil)
-		}
-	}
-
-	return event, action
-}
-
-// focusNotificationChannel focuses the channel/guild from the current notification
-func (a *application) focusNotificationChannel() {
-	if a.currentNotification == nil {
-		slog.Debug("no current notification to focus")
-		return
-	}
-
-	notif := a.currentNotification
-	slog.Debug("focusNotificationChannel", "channel_id", notif.channelID, "guild_id", notif.guildID, "is_dm", notif.isDM)
-
-	// SAFER APPROACH: Skip the problematic SelectChannel/onSelected path
-	// Instead, directly update the UI components if possible
-
-	if a.messagesList != nil && discordState != nil {
-		slog.Debug("attempting direct channel focus")
-
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error("panic during direct channel focus", "panic", r)
-					a.showNotificationError("Channel focus failed")
-				}
-			}()
-
-			// Get channel information
-			channel, err := discordState.Cabinet.Channel(notif.channelID)
-			if err != nil {
-				slog.Error("failed to get channel", "err", err, "channel_id", notif.channelID)
-				a.showNotificationError("Channel not found")
-				return
-			}
-
-			// Get messages for the channel
-			var messages []discord.Message
-			if channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM {
-				hasViewPerm := discordState.HasPermissions(notif.channelID, discord.PermissionViewChannel)
-				if !hasViewPerm {
-					messages = []discord.Message{}
-				} else {
-					messages, err = discordState.Messages(notif.channelID, uint(a.cfg.MessagesLimit))
-					if err != nil {
-						slog.Error("failed to get messages", "err", err)
-						messages = []discord.Message{}
-					}
-				}
-			} else {
-				messages, err = discordState.Messages(notif.channelID, uint(a.cfg.MessagesLimit))
-				if err != nil {
-					slog.Error("failed to get DM messages", "err", err)
-					messages = []discord.Message{}
-				}
-			}
-
-			// Update UI in main thread
-			a.QueueUpdateDraw(func() {
-				// Update messages list
-				a.messagesList.reset()
-				a.messagesList.setTitle(*channel)
-				a.messagesList.drawMessages(messages)
-				a.messagesList.ScrollToEnd()
-
-				// Update message input
-				hasNoPerm := channel.Type != discord.DirectMessage && channel.Type != discord.GroupDM &&
-					!discordState.HasPermissions(notif.channelID, discord.PermissionSendMessages)
-
-				a.messageInput.SetDisabled(hasNoPerm)
-				if hasNoPerm {
-					a.messageInput.SetPlaceholder("You do not have permission to send messages in this channel.")
-				} else {
-					a.messageInput.SetPlaceholder("Message...")
-				}
-
-				// Update selected channel tracking
-				a.selectedChannelID = notif.channelID
-				a.selectedGuildID = notif.guildID
-
-				// Focus the messages list
-				a.SetFocus(a.messagesList)
-
-				slog.Debug("direct channel focus completed successfully")
-			})
-		}()
-	} else {
-		slog.Error("cannot focus channel: messagesList or discordState is nil")
-		a.showNotificationError("Cannot focus channel")
-	}
-}
-
-// showNotificationError displays an error message in the notification area
-func (a *application) showNotificationError(message string) {
-	a.QueueUpdateDraw(func() {
-		if a.notificationArea != nil {
-			a.notificationArea.Clear()
-			fmt.Fprintf(a.notificationArea, "[::b][red]🔗 %s[-]", message)
-		}
-	})
 }
 
 func (a *application) onPagesInputCapture(event *tcell.EventKey) *tcell.EventKey {
@@ -443,15 +293,6 @@ func (a *application) ShowNotification(message string) {
 	a.showNotification(message, duration)
 }
 
-// ShowNotificationWithInfo displays a notification with channel/guild context for click-to-focus
-func (a *application) ShowNotificationWithInfo(message string, channelID discord.ChannelID, guildID discord.GuildID, isDM bool) {
-	duration := 30 * time.Second // Default duration
-	if a.cfg.Notifications.Duration > 0 {
-		duration = time.Duration(a.cfg.Notifications.Duration) * time.Second
-	}
-	a.showNotificationWithInfo(message, duration, channelID, guildID, isDM)
-}
-
 // showNotification handles notifications
 func (a *application) showNotification(message string, duration time.Duration) {
 	if a.notificationArea != nil {
@@ -482,47 +323,10 @@ func (a *application) showNotification(message string, duration time.Duration) {
 	}
 }
 
-// showNotificationWithInfo handles notifications with channel/guild context for click-to-focus
+// Just call the regular showNotification method since we removed the click functionality
 func (a *application) showNotificationWithInfo(message string, duration time.Duration, channelID discord.ChannelID, guildID discord.GuildID, isDM bool) {
-	if a.notificationArea != nil {
-		// Clear previous content and add new notification
-		a.notificationArea.Clear()
-
-		// Store notification info for click handling
-		regionID := fmt.Sprintf("notif_%d", time.Now().UnixNano())
-		a.currentNotification = &notificationInfo{
-			message:   message,
-			channelID: channelID,
-			guildID:   guildID,
-			isDM:      isDM,
-			regionID:  regionID,
-		}
-
-		// Truncate message to fit on one line (reserve space for "Notification: " prefix)
-		maxMessageLen := 80 // Adjust based on typical terminal width
-		if len(message) > maxMessageLen {
-			message = message[:maxMessageLen] + "..."
-		}
-
-		// Display notification with a clickable indicator
-		// The entire notification area is clickable via mouse handler
-		fmt.Fprintf(a.notificationArea, "[::b][blue]🔗 Click to focus[-] %s", message)
-
-		// Scroll to top to ensure first line is always visible
-		a.notificationArea.ScrollToBeginning()
-
-		// Auto-clear notifications after duration
-		if duration > 0 {
-			go func() {
-				time.Sleep(duration)
-				if a.notificationArea != nil {
-					// Use direct update instead of QueueUpdateDraw to avoid potential deadlocks
-					a.notificationArea.Clear()
-					a.currentNotification = nil
-				}
-			}()
-		}
-	}
+	// Strip out channel/guild context and just show the message like a regular notification
+	a.showNotification(message, duration)
 }
 
 // ClearNotification clears the current notification
@@ -531,7 +335,6 @@ func (a *application) ClearNotification() {
 		// Use direct update instead of QueueUpdateDraw to avoid potential deadlocks
 		a.notificationArea.Clear()
 		a.notificationArea.ScrollToBeginning()
-		a.currentNotification = nil
 	}
 }
 

@@ -58,7 +58,7 @@ func Run() error {
 	}
 
 	// Apply terminal-specific optimizations before initializing the application
-	applyTerminalOptimizations()
+	applyTerminalOptimizations(cfg)
 
 	token := *tokenFlag
 	if token == "" {
@@ -79,20 +79,14 @@ func Run() error {
 }
 
 // applyTerminalOptimizations applies terminal-specific optimizations to reduce visual artifacts
-func applyTerminalOptimizations() {
-	// Check if we're running in kitty terminal
-	if ui.IsKittyTerminal() {
-		// Set environment variables to help with kitty-specific rendering issues
-		if os.Getenv("TCELL_TRUECOLOR") == "" {
-			os.Setenv("TCELL_TRUECOLOR", "disable")
-		}
+func applyTerminalOptimizations(cfg *config.Config) {
+	// Apply general terminal optimizations first
+	ui.ApplyGeneralTerminalOptimizations()
 
-		// Ensure proper color handling for kitty
-		if os.Getenv("COLORTERM") == "" {
-			os.Setenv("COLORTERM", "truecolor")
-		}
-
-		// Additional kitty-specific optimizations
-		os.Setenv("TERM", ui.GetKittyCompatibleTerm())
-	}
+	// Apply Kitty-specific optimizations with config options
+	ui.ApplyKittyOptimizationsWithConfig(
+		cfg.Terminal.TrueColor,
+		cfg.Terminal.ForceTerm,
+		cfg.Terminal.OptimizeForKitty,
+	)
 }

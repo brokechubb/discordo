@@ -35,6 +35,39 @@ func sendDesktopNotification(title string, message string, image string, playSou
 	return nil
 }
 
+func sendDesktopNotificationAirdrop(title string, message string, image string, playSound bool, duration int) error {
+	if err := beeep.Notify(title, message, image); err != nil {
+		return err
+	}
+
+	if playSound {
+		cfg, err := config.Load(config.DefaultPath())
+		if err != nil {
+			return beeep.Beep(beeep.DefaultFreq, duration)
+		}
+
+		// Use airdrop-specific sound file if configured, otherwise fall back to regular sound
+		soundFile := cfg.Notifications.Sound.AirdropFile
+		if soundFile != "" {
+			if err := playSoundFile(soundFile); err == nil {
+				return nil
+			}
+		}
+
+		// Fall back to regular notification sound if airdrop sound is not available or fails
+		soundFile = cfg.Notifications.Sound.File
+		if soundFile != "" {
+			if err := playSoundFile(soundFile); err == nil {
+				return nil
+			}
+		}
+
+		return beeep.Beep(beeep.DefaultFreq, duration)
+	}
+
+	return nil
+}
+
 func playSoundFile(filePath string) error {
 	// Audio disabled for cross-compilation builds, but try to play using system commands
 	if _, err := os.Stat(filePath); err != nil {

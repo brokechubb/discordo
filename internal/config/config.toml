@@ -34,6 +34,9 @@ only_on_ping = true
 # Path to custom sound file (supports .wav, .mp3, .ogg, etc.)
 # Leave empty to use system default beep
 file = ""
+# Path to custom sound file for tip.cc airdrops (supports .wav, .mp3, .ogg, etc.)
+# Leave empty to use the regular notification sound
+airdrop_file = ""
 
 [tipcc]
 # Toggle tip.cc autoclaim on/off
@@ -57,6 +60,22 @@ triviadrop_delay_ms = 200
 
 # Timeout in milliseconds for triviadrop button watching
 triviadrop_timeout_ms = 1000
+
+# Terminal-specific configuration for optimal display
+[terminal]
+# TrueColor controls 24-bit color support
+# "auto" = let tcell auto-detect (recommended for most terminals including Kitty)
+# "enable" = force enable truecolor
+# "disable" = force disable truecolor (use 256 colors)
+truecolor = "auto"
+
+# Override the TERM environment variable (leave empty for auto-detection)
+# For Kitty: leave empty to auto-detect, or use "xterm-kitty" or "xterm-256color"
+force_term = ""
+
+# Enable Kitty-specific optimizations when running in Kitty terminal
+# This includes proper truecolor handling and terminal detection
+optimize_for_kitty = true
 
 # Global shortcuts
 # Esc: Reset message selection or close the channel selection popup.

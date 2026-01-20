@@ -290,6 +290,7 @@ func (h *interactionHandler) IsTipCCTriviaDropMessage(message discord.Message) b
 	// Primary triviadrop patterns - most specific first
 	primaryPatterns := []string{
 		"$triviadrop",
+		"trivia time",
 		"trivia drop",
 		"triviadrop",
 		"trivia drop appears",
@@ -947,7 +948,11 @@ func (h *interactionHandler) selectSpecificAnswer(message discord.Message, strat
 		"target_letter", targetLetter,
 		"available_options", len(answerButtons))
 
-	return answerButtons[0], nil
+	if len(answerButtons) > 0 {
+		return answerButtons[0], nil
+	}
+
+	return AnswerChoice{}, fmt.Errorf("no valid answer buttons for strategy %s", strategy)
 }
 
 // selectRandomAnswer randomly selects an answer from available options
@@ -1302,6 +1307,19 @@ func (h *interactionHandler) watchForTriviaDropButtons(messageID discord.Message
 			if len(message.Components) > 0 {
 				slog.Info("🧩 Triviadrop buttons detected", "message_id", messageID)
 				h.detectButtonsInMessage(*message, channelID)
+
+				// Handle triviadrop-specific processing
+				for _, embed := range message.Embeds {
+					if h.IsTipCCTriviaDropMessage(*message) && h.cfg.TipCC.TriviaDrop {
+						slog.Info("🧩 Processing triviadrop after button detection", "message_id", messageID)
+						err := h.handleTriviaDrop(*message, channelID, embed)
+						if err != nil {
+							slog.Error("Failed to handle triviadrop", "error", err, "message_id", messageID)
+						}
+						return
+					}
+				}
+
 				return
 			}
 
@@ -1531,7 +1549,14 @@ func (h *interactionHandler) handleTipCCDropMessage(message discord.Message, cha
 	}
 
 	// Log if no drop types matched
-	slog.Info("No matching drop type found", "title", message.Embeds[0].Title, "description_length", len(message.Embeds[0].Description))
+	if len(message.Embeds) > 0 {
+		slog.Info("No matching drop type found",
+			"title", message.Embeds[0].Title,
+			"description_length", len(message.Embeds[0].Description))
+	} else {
+		slog.Info("No matching drop type found",
+			"reason", "no embeds in message")
+	}
 
 	// Log any remaining buttons for manual attention
 	if len(message.Components) > 0 {

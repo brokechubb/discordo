@@ -31,8 +31,23 @@ func ExtractTriviaQuestion(message discord.Message) (string, string, error) {
 
 	// Extract question from embed description
 	// Format: **User** asked: *question*
-	questionPattern := regexp.MustCompile(`\*\*([^*]+)\*\*`)
+	// We need to extract the question after "asked:" which is wrapped in single asterisks
+	questionPattern := regexp.MustCompile(`asked:\s*\*([^*]+)\*`)
 	matches := questionPattern.FindStringSubmatch(embed.Description)
+
+	// Fallback: try extracting question without asterisks (plain text after "asked:")
+	if len(matches) < 2 {
+		questionPattern = regexp.MustCompile(`asked:\s*(.+?)(?:\n|$)`)
+		matches = questionPattern.FindStringSubmatch(embed.Description)
+	}
+
+	// Fallback: if no "asked:" pattern, try to get the main text (could be just the question)
+	if len(matches) < 2 {
+		// Try to extract any text that looks like a question (ends with ?)
+		questionPattern = regexp.MustCompile(`([^*\n]+\?)`)
+		matches = questionPattern.FindStringSubmatch(embed.Description)
+	}
+
 	if len(matches) < 2 {
 		return "", "", fmt.Errorf("could not extract question from description: %s", embed.Description)
 	}

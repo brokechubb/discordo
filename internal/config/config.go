@@ -27,9 +27,10 @@ type (
 	}
 
 	Sound struct {
-		Enabled    bool   `toml:"enabled"`
-		OnlyOnPing bool   `toml:"only_on_ping"`
-		File       string `toml:"file"`
+		Enabled     bool   `toml:"enabled"`
+		OnlyOnPing  bool   `toml:"only_on_ping"`
+		File        string `toml:"file"`
+		AirdropFile string `toml:"airdrop_file"`
 	}
 
 	TipCC struct {
@@ -40,6 +41,24 @@ type (
 		TriviaStrategy string `toml:"triviadrop_strategy"`
 		TriviaDelay    int    `toml:"triviadrop_delay_ms"`
 		TriviaTimeout  int    `toml:"triviadrop_timeout_ms"`
+	}
+
+	// Terminal contains terminal-specific configuration options
+	Terminal struct {
+		// TrueColor controls 24-bit color support
+		// "auto" = let tcell auto-detect (default, recommended for Kitty)
+		// "enable" = force enable truecolor
+		// "disable" = force disable truecolor (use 256 colors)
+		TrueColor string `toml:"truecolor"`
+
+		// ForceTerm overrides the TERM environment variable
+		// Leave empty to use auto-detection
+		ForceTerm string `toml:"force_term"`
+
+		// OptimizeForKitty enables Kitty-specific optimizations
+		// When true, uses settings optimized for Kitty terminal
+		// When false, disables automatic Kitty detection
+		OptimizeForKitty bool `toml:"optimize_for_kitty"`
 	}
 
 	Config struct {
@@ -59,6 +78,7 @@ type (
 		Timestamps    Timestamps    `toml:"timestamps"`
 		Notifications Notifications `toml:"notifications"`
 		TipCC         TipCC         `toml:"tipcc"`
+		Terminal      Terminal      `toml:"terminal"`
 
 		Keys  Keys  `toml:"keys"`
 		Theme Theme `toml:"theme"`
@@ -127,6 +147,12 @@ func Load(path string) (*Config, error) {
 	if cfg.TipCC.TriviaTimeout == 0 {
 		cfg.TipCC.TriviaTimeout = 1000
 	}
+
+	// Set default terminal values
+	if cfg.Terminal.TrueColor == "" {
+		cfg.Terminal.TrueColor = "auto"
+	}
+	// OptimizeForKitty defaults to true (enabled by TOML default)
 
 	return &cfg, nil
 }

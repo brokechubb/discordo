@@ -35,3 +35,40 @@ func sendDesktopNotification(title string, message string, image string, playSou
 
 	return n.Push()
 }
+
+func sendDesktopNotificationAirdrop(title string, message string, image string, playSound bool, _ int) error {
+	n := gosxnotifier.NewNotification(message)
+	n.Title = title
+	n.ContentImage = image
+
+	if playSound {
+		cfg, err := config.Load(config.DefaultPath())
+		if err != nil {
+			n.Sound = gosxnotifier.Default
+			return n.Push()
+		}
+
+		// Use airdrop-specific sound file if configured, otherwise fall back to regular sound
+		soundFile := cfg.Notifications.Sound.AirdropFile
+		if soundFile != "" {
+			if _, err := os.Stat(soundFile); err == nil {
+				n.Sound = gosxnotifier.Sound(soundFile)
+				return n.Push()
+			}
+		}
+
+		// Fall back to regular notification sound if airdrop sound is not available or fails
+		soundFile = cfg.Notifications.Sound.File
+		if soundFile != "" {
+			if _, err := os.Stat(soundFile); err == nil {
+				n.Sound = gosxnotifier.Sound(soundFile)
+			} else {
+				n.Sound = gosxnotifier.Default
+			}
+		} else {
+			n.Sound = gosxnotifier.Default
+		}
+	}
+
+	return n.Push()
+}

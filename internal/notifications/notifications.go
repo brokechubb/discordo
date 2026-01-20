@@ -20,6 +20,11 @@ func Send(title string, content string, playSound bool, duration int) error {
 	return sendDesktopNotification(title, content, "", playSound, duration)
 }
 
+// SendAirdrop sends a desktop notification specifically for airdrops with potentially different sound
+func SendAirdrop(title string, content string, playSound bool, duration int) error {
+	return sendDesktopNotificationAirdrop(title, content, "", playSound, duration)
+}
+
 func Notify(state *ningen.State, message *gateway.MessageCreateEvent, cfg *config.Config) error {
 	if !cfg.Notifications.Enabled || cfg.Status == discord.DoNotDisturbStatus {
 		return nil

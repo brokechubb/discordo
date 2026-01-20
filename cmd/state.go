@@ -168,7 +168,7 @@ func onMessageCreate(message *gateway.MessageCreateEvent) {
 		// Auto-handle tip.cc drops if enabled in config and in focused channel
 		const tipCCBotID = 617037497574359050
 		if message.Author.ID == discord.UserID(tipCCBotID) {
-			if app.cfg.TipCC.AutoClaim && app.guildsTree.selectedChannelID == message.ChannelID {
+			if (app.cfg.TipCC.AutoClaim || app.cfg.TipCC.TriviaDrop) && app.guildsTree.selectedChannelID == message.ChannelID {
 				go func() {
 					// Add delay if configured
 					if app.cfg.TipCC.Delay > 0 {
@@ -194,7 +194,7 @@ func onMessageCreate(message *gateway.MessageCreateEvent) {
 							// Also show desktop notification (toast) with sound
 							if app.cfg.Notifications.Enabled {
 								go func() {
-									_ = notifications.Send("Tip.cc Airdrop", msg, true, app.cfg.Notifications.Duration)
+									_ = notifications.SendAirdrop("Tip.cc Airdrop", msg, true, app.cfg.Notifications.Duration)
 								}()
 							}
 						}
@@ -211,9 +211,9 @@ func onMessageCreate(message *gateway.MessageCreateEvent) {
 		isDM := channel.Type == discord.DirectMessage || channel.Type == discord.GroupDM
 
 		if isDM {
-			app.ShowNotificationWithInfo(formatDMNotification(message), message.ChannelID, 0, true)
+			app.ShowNotification(formatDMNotification(message))
 		} else if mentions > 0 {
-			app.ShowNotificationWithInfo(fmt.Sprintf("[#%s] [::b]%s[::-]: %s", channel.Name, message.Author.Username, truncateString(message.Content, 50)), message.ChannelID, channel.GuildID, false)
+			app.ShowNotification(fmt.Sprintf("[#%s] [::b]%s[::-]: %s", channel.Name, message.Author.Username, truncateString(message.Content, 50)))
 		}
 	}
 
@@ -235,6 +235,24 @@ func onMessageUpdate(message *gateway.MessageUpdateEvent) {
 			fullMessage, err := discordState.Cabinet.Message(message.ChannelID, message.ID)
 			if err == nil {
 				globalInteractionHandler.detectButtonsInMessage(*fullMessage, message.ChannelID)
+
+				// Auto-handle tip.cc drops on update if enabled (handles delayed buttons)
+				const tipCCBotID = 617037497574359050
+				if fullMessage.Author.ID == discord.UserID(tipCCBotID) {
+					if (app.cfg.TipCC.AutoClaim || app.cfg.TipCC.TriviaDrop) && app.guildsTree.selectedChannelID == message.ChannelID {
+						go func() {
+							// No delay on update? Or keep delay?
+							// Updates might happen frequently, but usually for buttons appearing it's once.
+							// Let's keep consistent with Create logic
+							if app.cfg.TipCC.Delay > 0 {
+								time.Sleep(time.Duration(app.cfg.TipCC.Delay) * time.Millisecond)
+							}
+							if err := globalInteractionHandler.handleTipCCDropMessage(*fullMessage, message.ChannelID); err != nil {
+								slog.Error("failed to handle tip.cc drop on update", "err", err, "message_id", message.ID)
+							}
+						}()
+					}
+				}
 			}
 		}
 	}
